@@ -21,7 +21,7 @@
 !	z_read(1:10) = 0.0, 100.0, 1000.0, 2000.0, 2500.0, 
 !                       3000.0, 3500.0, 4000.0, 4500.0 5000.0/
  &run_vars
-	outputfile = '/tmp/output2.nc',
+	outputfile = '/tmp/output1.nc',
 	runtime=3000.,
 	ip=200,
 	kp=200,
@@ -33,7 +33,7 @@
 	halo=0,
 	monotone=.true.,    ! monotone advection (except precip)
 	microphysics_flag=.true., ! flag for microphysics
-	hm_flag=.false.,	     ! switch hm process on / off
+	hm_flag=.true.,	     ! switch hm process on / off
 	theta_flag=.false.,  ! advect theta
 	num_ice=1000.,      ! number conc of primary ice crystals /kg
 	mass_ice=1.e-14/    ! mass of new ice crystal  
