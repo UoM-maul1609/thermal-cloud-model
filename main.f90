@@ -34,7 +34,8 @@
         ! namelists                                                            !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! define namelist for environment
-        namelist /sounding_spec/ adiabatic_prof, psurf, tsurf, t_cbase, t_ctop, &
+        namelist /sounding_spec/ adiabatic_prof, adiabatic_frac, &
+        					psurf, tsurf, t_cbase, t_ctop, &
         					n_levels_s, q_read, theta_read, rh_read, z_read
         ! define namelist for run parameters
         namelist /run_vars/ outputfile, runtime, ip, kp, dx, dz, dt, &
@@ -44,7 +45,7 @@
         			
         ! define namelist for thermal
         namelist /thermal_vars/ k, dsm_by_dz_z_eq_zc, b, del_gamma_mac, &
- 					del_c_s, del_c_t, epsilon_therm
+ 					del_c_s, del_c_t, epsilon_therm, w_peak
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -69,7 +70,8 @@
         ! allocate and initialise the grid                                     !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         call calc_profile_2d(nq,n_levels_s,psurf,tsurf,t_cbase,t_ctop, &
-        					adiabatic_prof, q_type,q_init, z_read,theta_read, &
+        					adiabatic_prof, adiabatic_frac, &
+        					q_type,q_init, z_read,theta_read, &
                             q_read,ip,kp,o_halo,dx,dz,grid1%q, grid1%precip, &
                             grid1%theta, grid1%p,grid1%x,grid1%xn, &
                             grid1%z,grid1%zn,grid1%t,grid1%rho,grid1%u,grid1%w, &
@@ -90,7 +92,8 @@
                             monotone,microphysics_flag,hm_flag,theta_flag, &
                             mass_ice, &
                             k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & ! variables associated 
-                            del_c_s,del_c_t,epsilon_therm,therm_init) ! with thermal props
+                            del_c_s,del_c_t,epsilon_therm,w_peak, &! with thermal props
+                            therm_init) 
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

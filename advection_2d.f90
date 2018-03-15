@@ -134,15 +134,15 @@
 					(q_k_old(k,i+1)-q_k_old(k,i) ) / &
 					(q_k_old(k,i+1)+q_k_old(k,i)+small) /dx - u_j_bar1
 				! divergent flow: eq 38 smolarkiewicz 1984
-! 				ut_sav(k,i)=ut_sav(k,i) - 0.25_sp*dt*ut(k,i)* &
-! 					( (ut(k,i+1)-ut(k,i-1))/dx-u_div1 )
+ 				ut_sav(k,i)=ut_sav(k,i) - 0.25_sp*dt*ut(k,i)* &
+ 					( (ut(k,i+1)-ut(k,i-1))/dx-u_div1 )
 				!!!!
 				wt_sav(k,i)=(abs(wt(k,i))*dz-dt*wt(k,i)*wt(k,i) ) * &
 					(q_k_old(k+1,i)-q_k_old(k,i) ) / &
 					(q_k_old(k+1,i)+q_k_old(k,i)+small) /dz - u_j_bar3
 				! divergent flow: eq 38 smolarkiewicz 1984
-! 				wt_sav(k,i)=wt_sav(k,i) - 0.25_sp*dt*wt(k,i)* &
-! 					( (wt(k+1,i)-wt(k-1,i))/dz-u_div3 )
+ 				wt_sav(k,i)=wt_sav(k,i) - 0.25_sp*dt*wt(k,i)* &
+ 					( (wt(k+1,i)-wt(k-1,i))/dz-u_div3 )
 				!!!!          
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			  enddo
@@ -156,7 +156,7 @@
         ! Non oscillatory forward in time (NFT) flux limiter -                           !
         ! Smolarkiewicz and Grabowski (1990)                                             !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(it.ge.2.and.monotone) then
+		if((it.ge.2).and.monotone) then
 		do i=-o_halo+3,ip+o_halo-2 
 			do k=-o_halo+3,kp+o_halo-2
 	
@@ -164,16 +164,16 @@
 			
 		! x direction - note: should the last q in the max/min be q+1?
 		psi_i_max=max(q_k(k,i-1),q_k(k,i),q_k(k,i+1), &
-					q_k_old(k,i-1),q_k_old(k,i),q_k_old(k,i-1))
+					q_k_old(k,i-1),q_k_old(k,i),q_k_old(k,i+1))
 					
 		psi_i_min=min(q_k(k,i-1),q_k(k,i),q_k(k,i+1), &
-					q_k_old(k,i-1),q_k_old(k,i),q_k_old(k,i-1))
+					q_k_old(k,i-1),q_k_old(k,i),q_k_old(k,i+1))
 					
 		psi_ip_max=max(q_k(k,i),q_k(k,i+1),q_k(k,i+2), &
-					q_k_old(k,i),q_k_old(k,i+1),q_k_old(k,i))
+					q_k_old(k,i),q_k_old(k,i+1),q_k_old(k,i+2))
 					
 		psi_ip_min=min(q_k(k,i),q_k(k,i+1),q_k(k,i+2), &
-					q_k_old(k,i),q_k_old(k,i+1),q_k_old(k,i))
+					q_k_old(k,i),q_k_old(k,i+1),q_k_old(k,i+2))
 
 
 
@@ -203,16 +203,16 @@
  		
 		! z direction - note: should the last q in the max/min be q+1?
 		psi_i_max=max(q_k(k-1,i),q_k(k,i),q_k(k+1,i), &
-					q_k_old(k-1,i),q_k_old(k,i),q_k_old(k-1,i))
+					q_k_old(k-1,i),q_k_old(k,i),q_k_old(k+1,i))
 					
 		psi_i_min=min(q_k(k-1,i),q_k(k,i),q_k(k+1,i), &
-					q_k_old(k-1,i),q_k_old(k,i),q_k_old(k-1,i))
+					q_k_old(k-1,i),q_k_old(k,i),q_k_old(k+1,i))
 					
 		psi_ip_max=max(q_k(k,i),q_k(k+1,i),q_k(k+2,i), &
-					q_k_old(k,i),q_k_old(k+1,i),q_k_old(k,i))
+					q_k_old(k,i),q_k_old(k+1,i),q_k_old(k+2,i))
 					
 		psi_ip_min=min(q_k(k,i),q_k(k+1,i),q_k(k+2,i), &
-					q_k_old(k,i),q_k_old(k+1,i),q_k_old(k,i))
+					q_k_old(k,i),q_k_old(k+1,i),q_k_old(k+2,i))
 
 
 

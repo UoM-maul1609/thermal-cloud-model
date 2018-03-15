@@ -23,6 +23,7 @@
 	!>@param[in] t_cbase cloud base temperature
 	!>@param[in] t_ctop cloud top temperature
 	!>@param[in] adiabatic_prof: flag if we want an adiabatic profile
+	!>@param[in] adiabatic_frac: fraction of adiabatic liquid water content in cloud
 	!>@param[in] q_type flag for type of q-field
 	!>@param[in] q_init flag for whether q-field initialised
 	!>@param[in] z_read vertical levels for sounding
@@ -37,7 +38,7 @@
 	!>@param[in] number conc of ice crystals #/kg
 	!>@param[in] mass of a single ice crystal kg.
     subroutine calc_profile_2d(nq,n_levels,psurf,tsurf,t_cbase, &
-    						t_ctop, adiabatic_prof, q_type,q_init, &
+    						t_ctop, adiabatic_prof, adiabatic_frac,q_type,q_init, &
                              z_read,theta_read,q_read, &
                              ip,kp,o_halo,dx,dz,q,precip,theta,p,x,xn,z,zn,t,rho,u,w, &
                              num_ice, mass_ice)
@@ -57,6 +58,7 @@
     integer(i4b), intent(in) :: ip, kp
     real(sp), intent(in) :: dx, dz, psurf, tsurf, t_cbase, t_ctop
     logical, intent(in) :: adiabatic_prof
+    real(sp), intent(in) :: adiabatic_frac
     real(sp), intent(in) :: num_ice, mass_ice
     ! inouts
     real(sp), dimension(:,:), allocatable, intent(inout) :: theta, p, t, rho,u, w
@@ -164,7 +166,7 @@
 			(p(istore,:)-dz*p(istore,:)/ra/t_ctop)/1.e5_sp)**(ra/cp) ! a temperature colder than
 		                                                   ! next level
 
-		t(istore,:)=zbrent(calc_theta_q,t(istore,1),t_ctop,1.e-5_sp)
+		t(istore,:)=zbrent(calc_theta_q,1.01*t(istore,1),t_ctop,1.e-5_sp)
 
 		t1old=t(istore,1)
 		do i=istore,kp+o_halo-1
@@ -192,7 +194,8 @@
 		do i=istore,istore2
 			q(1,i,:)=eps1*svp_liq(t(i,1))/ &
 								(p(i,1)-svp_liq(t(i,1)))
-			q(2,i,:)=max(eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase)) - q(1,i,1),0._sp)
+			q(2,i,:)=adiabatic_frac* &
+					max(eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase)) - q(1,i,1),0._sp)
 		enddo
 
 		! integrate going upwards - dry adiabatic layer
@@ -214,7 +217,6 @@
 			q(6,istore:istore2,:)=num_ice*mass_ice
 			q(7,istore:istore2,:)=num_ice
 		end where
-		q(2,:,:)=0._sp
 	else
 		! use linear interpolation to put sounding on grid:
 		do i=-o_halo+1,kp+o_halo

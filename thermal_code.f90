@@ -28,10 +28,12 @@
 	!>@param[in] del_c_s
 	!>@param[in] del_c_t
 	!>@param[in] epsilon_therm
-	!>@param[in] x,xn,z,zn,dz
-	!>@param[inout]  u, w,therm_init
+	!>@param[in] x,xn,z,zn,dx,dz
+	!>@param[inout]  u, w,
+	!>@param[in] w_peak 
+	!>@param[inout]  therm_init
     subroutine thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
-    						epsilon_therm,x,xn,z,zn,dz,u,w,therm_init)
+    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,therm_init)
 
     use nrtype
 
@@ -44,7 +46,7 @@
     					u,w
     real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x,xn
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z,zn
-    real(sp) :: dz
+    real(sp), intent(in) :: dx,dz, w_peak
     logical, intent(inout) :: therm_init
     
     ! local variable
@@ -132,7 +134,7 @@
 	wcen(0,:)=wcen(1,:)
 	u=0._sp
 	do i=2,ip
-		u(1:kp,i)=u(1:kp,i-1)-(wcen(1:kp,i)-wcen(0:kp-1,i))*dz/dz
+		u(1:kp,i)=u(1:kp,i-1)-(wcen(1:kp,i)-wcen(0:kp-1,i))*dx/dz
 	enddo
 	w(1:kp,1:ip)=(wcen(1:kp,1:ip))
 ! 	u(1,:)=0._sp
@@ -144,8 +146,8 @@
 		u(j,:)=u(1,:)
 		w(j,:)=w(1,:)
 	enddo
-	u=u/10._sp
-	w=w/10._sp
+	u=u*w_peak/maxval(w)
+	w=w*w_peak/maxval(w)
 
 	
     end subroutine thermal_2d
@@ -165,10 +167,12 @@
 	!>@param[in] del_c_s
 	!>@param[in] del_c_t
 	!>@param[in] epsilon_therm
-	!>@param[in] x,xn,z,zn,dz
-	!>@param[inout]  u, w,therm_init
+	!>@param[in] x,xn,z,zn,dx,dz
+	!>@param[inout]  u, w,
+	!>@param[in]  w_peak
+	!>@param[inout] therm_init
     subroutine fd_thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
-    						epsilon_therm,x,xn,z,zn,dz,u,w,therm_init)
+    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,therm_init)
 
     use nrtype
 
@@ -181,7 +185,8 @@
     					u,w
     real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x,xn
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z,zn
-    real(sp) :: dz
+    real(sp), intent(in) :: dx,dz
+    real(sp), intent(in) :: w_peak
     logical, intent(inout) :: therm_init
     
     ! local variable
@@ -236,7 +241,7 @@
 	! finite difference:
 	u(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo)= &
 		-(phi(-o_halo+2:kp+o_halo+1,-o_halo+1:ip+o_halo)- &
-		  phi(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo)) / dz
+		  phi(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo)) / dx
 	w(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo)= &
 	 	(phi(-o_halo+1:kp+o_halo,-o_halo+2:ip+o_halo+1)- &
 	 	 phi(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo)) / dz
@@ -285,7 +290,8 @@
 		w(j,:)=w(j,:)
 	enddo
 
-	
+	u=u*w_peak/maxval(w)
+	w=w*w_peak/maxval(w)
     end subroutine fd_thermal_2d
 
 

@@ -64,6 +64,7 @@
                                             .false.,.false.,.false.,.false., &
                                             .false.,.false.,.false./)
         logical :: micro_init=.true., adiabatic_prof=.false.
+        real(sp) :: adiabatic_frac
         logical :: monotone=.true.,microphysics_flag=.true.,theta_flag=.false., &
         			hm_flag=.true.
 		integer(i4b) :: advection_scheme=0
@@ -73,14 +74,14 @@
         real(sp), dimension(nlevels_r) :: theta_read,rh_read, &
                   z_read
         real(sp) :: dx, dz,dt, runtime, psurf, theta_surf,tsurf, t_cbase, t_ctop, t_thresh, &
-        			t_thresh2, w_peak, w_cb, theta_q_sat,t1old, p111, num_ice, mass_ice
+        			t_thresh2, w_cb, theta_q_sat,t1old, p111, num_ice, mass_ice
         integer(i4b) :: ip,kp, n_levels_s, ord, o_halo,halo, updraft_type
         character (len=200) :: outputfile='output'
         
         
         ! variables for thermal properties
         real(sp) :: k, dsm_by_dz_z_eq_zc, b, del_gamma_mac, &
-        			del_c_s, del_c_t, epsilon_therm
+        			del_c_s, del_c_t, epsilon_therm, w_peak
         logical :: therm_init=.true.
     end module variables
 

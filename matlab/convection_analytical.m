@@ -12,6 +12,7 @@ resz=50;
 xs=0:resx:10000;
 zs=0:resz:7000;
 
+
 xns=xs+resx./2;
 zns=zs+resz./2;
 
@@ -31,7 +32,7 @@ dsm_by_dz_z_eq_zc=-1.6e-6;
 b=1e-6; % range from 0 to 5e-6, default 1e-6
 del_gamma_mac=5e-4;
 del_c_s=0;
-del_c_T=0.5;  % changing alters height
+del_c_T=.5;  % changing alters height
 epsilon=3e-7; % changing this alters the height too
 cp=1005;
 L=2.5e6;
@@ -58,7 +59,7 @@ Z=k.*N_bar_mac.* ...
 X=1./k.^2.*cos(k.*x);
 
 % equation 42 of ZZRA
-phi=Z.*X;
+phi=(Z).*X;
 
 % u=-(phi(2:end,:)-phi(1:end-1,:))./resz;
 % w=(phi(:,2:end)-phi(:,1:end-1))./resx;

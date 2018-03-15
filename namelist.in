@@ -2,6 +2,7 @@
 
  &sounding_spec
  	adiabatic_prof=.true.,
+ 	adiabatic_frac=1.0,
  	psurf=100000.,
  	tsurf=300.,
  	t_cbase=290.,
@@ -45,5 +46,5 @@
  	del_gamma_mac=5.e-4,
  	del_c_s=0.,
  	del_c_t=0.5,		 ! changing alters height, default 0.5
- 	epsilon_therm=2.5e-7/ ! changing alters height too, default 3e-7
- 	
+ 	epsilon_therm=2.5e-7, ! changing alters height too, !default 3e-7
+ 	w_peak=0.3/ 		! scale the thermal so that the maximum is this
