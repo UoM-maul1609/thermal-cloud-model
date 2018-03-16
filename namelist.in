@@ -47,4 +47,5 @@
  	del_c_s=0.,
  	del_c_t=0.5,		 ! changing alters height, default 0.5
  	epsilon_therm=2.5e-7, ! changing alters height too, !default 3e-7
- 	w_peak=0.3/ 		! scale the thermal so that the maximum is this
+ 	w_peak=0.3, 		! scale the thermal so that the maximum is this
+ 	z_offset=0./		! offset in the vertical (if you want to move the thermals away from the ground

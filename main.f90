@@ -45,7 +45,7 @@
         			
         ! define namelist for thermal
         namelist /thermal_vars/ k, dsm_by_dz_z_eq_zc, b, del_gamma_mac, &
- 					del_c_s, del_c_t, epsilon_therm, w_peak
+ 					del_c_s, del_c_t, epsilon_therm, w_peak, z_offset
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -92,7 +92,8 @@
                             monotone,microphysics_flag,hm_flag,theta_flag, &
                             mass_ice, &
                             k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & ! variables associated 
-                            del_c_s,del_c_t,epsilon_therm,w_peak, &! with thermal props
+                            del_c_s,del_c_t,epsilon_therm,w_peak, &
+                            z_offset, & ! with thermal props
                             therm_init) 
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -30,10 +30,10 @@
 	!>@param[in] epsilon_therm
 	!>@param[in] x,xn,z,zn,dx,dz
 	!>@param[inout]  u, w,
-	!>@param[in] w_peak 
+	!>@param[in] w_peak , z_offset
 	!>@param[inout]  therm_init
     subroutine thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
-    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,therm_init)
+    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)
 
     use nrtype
 
@@ -46,7 +46,7 @@
     					u,w
     real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x,xn
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z,zn
-    real(sp), intent(in) :: dx,dz, w_peak
+    real(sp), intent(in) :: dx,dz, w_peak, z_offset
     logical, intent(inout) :: therm_init
     
     ! local variable
@@ -58,7 +58,7 @@
 
     ! calculate the thermal properties
 	if(therm_init) then
-		zc=zn(1) !0._sp !500._sp
+		zc=zn(1)-z_offset !0._sp !500._sp
 		alpha1=1._sp/ttr
 		!k=2.e-3_sp                      ! changes the width
 		!dsm_by_dz_z_eq_zc=-1.6e-6_sp    ! 
@@ -94,15 +94,15 @@
 			! equation 42 of ZZRA:
 ! 			phi=zz*xx
 			! u and w winds
-				zc=zn(1)
-				test3=(z(j)-zc)
+				zc=zn(1)-z_offset
+				test3=((z(j)-z_offset)-zc)
 				test1=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 				test1=-n_bar_mac/k*(z_bar+test3-k1*test3**2)/sqrt(test1) &
 						*sin(k*xn(i))
 									
-				zc=zn(1)
-				test3=(zn(j)-zc)
+				zc=zn(1)-z_offset
+				test3=((zn(j)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 
@@ -116,7 +116,7 @@
 ! 				w(j,i)=w(j,i)-imag(test2)
 				! w on centred points
 				zc=zn(1)
-				test3=(z(j)-zc)
+				test3=((z(j)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 				test2=n_bar_mac* sqrt(test2) *cos(k*x(i))
@@ -148,6 +148,15 @@
 	enddo
 	u=u*w_peak/maxval(w)
 	w=w*w_peak/maxval(w)
+	
+
+	
+	do j=1,kp+o_halo
+		if(zn(j) >= z_offset) exit
+
+		w(j,:)=0._sp
+		u(j,:)=0._sp
+	enddo
 
 	
     end subroutine thermal_2d
@@ -169,10 +178,10 @@
 	!>@param[in] epsilon_therm
 	!>@param[in] x,xn,z,zn,dx,dz
 	!>@param[inout]  u, w,
-	!>@param[in]  w_peak
+	!>@param[in]  w_peak, z_offset
 	!>@param[inout] therm_init
     subroutine fd_thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
-    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,therm_init)
+    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)
 
     use nrtype
 
@@ -186,7 +195,7 @@
     real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x,xn
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z,zn
     real(sp), intent(in) :: dx,dz
-    real(sp), intent(in) :: w_peak
+    real(sp), intent(in) :: w_peak, z_offset
     logical, intent(inout) :: therm_init
     
     ! local variable
@@ -197,7 +206,7 @@
 
     ! calculate the thermal properties
 	if(therm_init) then
-		zc=zn(1) !0._sp !500._sp
+		zc=zn(1)-z_offset !0._sp !500._sp
 		alpha1=1._sp/ttr
 		klarge=epsilon_therm*cp/lv
 		! equation 32:
@@ -217,14 +226,15 @@
 		do j=1,kp
 			! equation 39 of ZZRA:
 			zz(j,i)=k*n_bar_mac* &
-				sqrt(2._sp*(zn(j)-zc)*(z_bar+(zn(j)-zc)/2._sp-k1/3._sp*(zn(j)-zc)**2))
+				sqrt(2._sp*((zn(j)-z_offset)-zc)* &
+				(z_bar+((zn(j)-z_offset)-zc)/2._sp-k1/3._sp*((zn(j)-z_offset)-zc)**2))
 
 			! equation 41 of ZZRA:
 			xx(j,i)=1._sp/k**2._sp*cos(k*xn(i))
 
 			! equation 42 of ZZRA:
 			phi(j,i)=zz(j,i)*xx(j,i)
-			if(zn(j).ge.(zc+cell_size-0._sp*dz)) then
+			if((zn(j)-z_offset).ge.(zc+cell_size-0._sp*dz)) then
 				phi(j,i)=0._sp
 			endif
 		enddo
@@ -292,6 +302,15 @@
 
 	u=u*w_peak/maxval(w)
 	w=w*w_peak/maxval(w)
+	
+	do j=1,kp+o_halo
+		if(zn(j) >= z_offset) exit
+
+		w(j,:)=0._sp
+		u(j,:)=0._sp
+	enddo
+
+	
     end subroutine fd_thermal_2d
 
 

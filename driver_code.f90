@@ -40,6 +40,7 @@
 	!>@param[inout] del_c_t
 	!>@param[inout] epsilon_therm
 	!>@param[in] w_peak
+	!>@param[in] z_offset
 	!>@param[inout] therm_init
     subroutine model_driver_2d(nq,ip,kp,ord,o_halo,runtime, &
                                dt, &
@@ -48,7 +49,7 @@
                                microphysics_flag,hm_flag,theta_flag,mass_ice, &
                                ! variables associated with thermal properties
                                k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & 
-                               del_c_s,del_c_t,epsilon_therm,w_peak,therm_init)
+                               del_c_s,del_c_t,epsilon_therm,w_peak,z_offset, therm_init)
 
     use nrtype
     use thermal
@@ -72,7 +73,7 @@
     ! variables associated with thermals:
     real(sp), intent(inout) :: k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
     						epsilon_therm 
-    real(sp), intent(in) :: w_peak
+    real(sp), intent(in) :: w_peak, z_offset
 
     ! local variables
     integer(i4b) :: nt, i, j, nsteps, iter
@@ -88,7 +89,7 @@
     	! wind / thermal properties:
 		call thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc, &
 						b,del_gamma_mac,del_c_s,del_c_t, &
-    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,therm_init)   	
+    						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)   	
     	
         ! output:
         call output_2d(time,nq,ip,kp,q(:,1:kp,1:ip),precip(:,1:kp,1:ip), &
@@ -101,7 +102,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! advection                                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		nsteps=ceiling(dt/dz*maxval(sqrt(u**2+w**2)))
+		nsteps=ceiling(dt/(0.7_sp*dz)*maxval(sqrt(u**2+w**2)))
 		select case (advection_scheme)
 			case (0) ! upstream
 				do iter=1,nsteps

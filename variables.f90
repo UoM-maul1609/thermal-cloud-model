@@ -81,7 +81,7 @@
         
         ! variables for thermal properties
         real(sp) :: k, dsm_by_dz_z_eq_zc, b, del_gamma_mac, &
-        			del_c_s, del_c_t, epsilon_therm, w_peak
+        			del_c_s, del_c_t, epsilon_therm, w_peak, z_offset=0.
         logical :: therm_init=.true.
     end module variables
 
