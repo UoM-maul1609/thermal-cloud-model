@@ -12,7 +12,8 @@
 	
     real(sp), parameter :: Md=29.e-3_sp,Mv=18.e-3_sp,grav=9.81_sp,cp=1005._sp, &
     					lv=2.5e6_sp,ttr=273.15_sp, small1=1.e-30_sp
-	real(sp) :: zc,beta1=Md/Mv-1._sp, alpha1=1./ttr, klarge, n_bar_mac, z_bar, k1,cell_size
+	real(sp) :: zc,beta1=Md/Mv-1._sp, alpha1=1./ttr, klarge, z_bar, k1,cell_size
+	complex(sp) :: n_bar_mac
     contains
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -70,7 +71,8 @@
 		!epsilon_therm=3e-7_sp			! changing this alters height too
 		klarge=epsilon_therm*cp/lv
 		! equation 32:
-		n_bar_mac=sqrt(grav*(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b)))
+		n_bar_mac=grav*(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
+		n_bar_mac=sqrt(n_bar_mac)
 		! equation 33:
 		z_bar=(alpha1*del_c_t+beta1*del_c_s)/ &
     		(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
@@ -108,7 +110,7 @@
 							 k1/3._sp*test3**2._sp)
 
 				test2=n_bar_mac* sqrt(test2) *cos(k*x(i))
-				
+
 				u(j,i)=real(test1)!+imag(test1)
 ! 				if(j.eq.122) u(j,i)=u(j,i)-imag(test1)
 				w(j,i)=real(test2)!+imag(test2)
@@ -211,7 +213,8 @@
 		alpha1=1._sp/ttr
 		klarge=epsilon_therm*cp/lv
 		! equation 32:
-		n_bar_mac=sqrt(grav*(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b)))
+		n_bar_mac=grav*(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
+		n_bar_mac=sqrt(n_bar_mac)
 		! equation 33:
 		z_bar=(alpha1*del_c_t+beta1*del_c_s)/ &
     		(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
