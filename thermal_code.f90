@@ -9,9 +9,10 @@
     
     
 	! variables for thermal properties
-	real(sp) :: zc,beta1, alpha1, klarge, n_bar_mac, z_bar, k1,cell_size
-    real(sp), parameter :: Md=29e-3_sp,Mv=18.e-3_sp,grav=9.81_sp,cp=1005._sp, &
+	
+    real(sp), parameter :: Md=29.e-3_sp,Mv=18.e-3_sp,grav=9.81_sp,cp=1005._sp, &
     					lv=2.5e6_sp,ttr=273.15_sp, small1=1.e-30_sp
+	real(sp) :: zc,beta1=Md/Mv-1._sp, alpha1=1./ttr, klarge, n_bar_mac, z_bar, k1,cell_size
     contains
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -73,7 +74,7 @@
 		! equation 33:
 		z_bar=(alpha1*del_c_t+beta1*del_c_s)/ &
     		(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
-    	z_bar=0._sp
+    	!z_bar=0._sp
     	k1=0.5_sp*(alpha1*epsilon_therm-beta1*klarge)/ &
     		(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
     	cell_size=3._sp/4._sp/k1*(1._sp+sqrt(1._sp+16._sp/3._sp*k1*z_bar))
@@ -214,7 +215,7 @@
 		! equation 33:
 		z_bar=(alpha1*del_c_t+beta1*del_c_s)/ &
     		(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
-    	z_bar=0._sp
+    	!z_bar=0._sp
     	k1=0.5_sp*(alpha1*epsilon_therm-beta1*klarge)/ &
     		(alpha1*del_gamma_mac+beta1*(dsm_by_dz_z_eq_zc+b))
     	cell_size=3._sp/4._sp/k1*(1._sp+sqrt(1._sp+16._sp/3._sp*k1*z_bar))
