@@ -306,26 +306,6 @@
     end subroutine calc_profile_2d
 
 
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	! saturation vapour pressure over liquid                                       !
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	!>@author
-	!>Paul J. Connolly, The University of Manchester
-	!>@brief
-	!>calculates the saturation vapour pressure over liquid water according to buck fit
-	!>@param[in] t: temperature
-	!>@return svp_liq: saturation vapour pressure over liquid water
-	function svp_liq(t)
-		use nrtype
-		use constants, only : ttr
-		implicit none
-		real(sp), intent(in) :: t
-		real(sp) :: svp_liq
-		svp_liq = 100._sp*6.1121_sp* &
-			  exp((18.678_sp - (t-ttr)/ 234.5_sp)* &
-			  (t-ttr)/(257.14_sp + (t-ttr)))
-	end function svp_liq
-
 	subroutine hydrostatic1(p,z,dzdp)
 	use nrtype
 	use constants
@@ -424,6 +404,27 @@
 	calc_theta_q2=t1old*(1e5_sp/p)**(ra/cp)*exp(lv*ws/cp/t1old)-theta_q_sat
 
 	end function calc_theta_q2    
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! saturation vapour pressure over liquid                                       !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates the saturation vapour pressure over liquid water according to buck fit
+	!>@param[in] t: temperature
+	!>@return svp_liq: saturation vapour pressure over liquid water
+	function svp_liq(t)
+		use nrtype
+		use constants, only : ttr
+		implicit none
+		real(sp), intent(in) :: t
+		real(sp) :: svp_liq
+		svp_liq = 100._sp*6.1121_sp* &
+			  exp((18.678_sp - (t-ttr)/ 234.5_sp)* &
+			  (t-ttr)/(257.14_sp + (t-ttr)))
+	end function svp_liq
 
 
 
