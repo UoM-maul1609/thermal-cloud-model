@@ -15,6 +15,7 @@
 	!>writes to output file, solves for the microphysics over one time-step, 
 	!> then advects particles
 	!>@param[in] nq: number of q fields
+	!>@param[in] nprec: number of precipitation arrays
 	!>@param[in] ip: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] ord: order of advection scheme
@@ -42,7 +43,7 @@
 	!>@param[in] w_peak
 	!>@param[in] z_offset
 	!>@param[inout] therm_init
-    subroutine model_driver_2d(nq,ip,kp,ord,o_halo,runtime, &
+    subroutine model_driver_2d(nq,nprec,ip,kp,ord,o_halo,runtime, &
                                dt, &
                                q,precip,theta,p,dx,dz,x,xn,z,zn,t,rho,&
                                u,w,new_file,micro_init,advection_scheme, monotone, &
@@ -58,16 +59,17 @@
     use micro_module
 
     implicit none
-    integer(i4b), intent(in) :: nq,ip,kp, ord, o_halo, advection_scheme
+    integer(i4b), intent(in) :: nq,nprec,ip,kp, ord, o_halo, advection_scheme
     real(sp), intent(in) :: runtime, dt, dx,dz
     real(sp), dimension(nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: q
-    real(sp), dimension(4,1:kp,1:ip), intent(inout) :: precip
+    real(sp), dimension(nprec,1:kp,1:ip), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: z,zn
     real(sp), dimension(-o_halo+1:ip+o_halo), intent(inout) :: x,xn
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: theta, p, &
     																			t,rho,u,w
     logical, intent(inout) :: new_file, micro_init,therm_init
-    logical, intent(in) :: monotone,microphysics_flag, hm_flag,theta_flag
+    logical, intent(in) :: monotone,hm_flag,theta_flag
+    integer(i4b), intent(in) :: microphysics_flag
     real(sp), intent(in) :: mass_ice
     
     ! variables associated with thermals:
@@ -92,7 +94,7 @@
     						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)   	
     	
         ! output:
-        call output_2d(time,nq,ip,kp,q(:,1:kp,1:ip),precip(:,1:kp,1:ip), &
+        call output_2d(time,nq,nprec,ip,kp,q(:,1:kp,1:ip),precip(:,1:kp,1:ip), &
 						theta(1:kp,1:ip),p(1:kp,1:ip), &
 						x(1:ip),xn(1:ip),z(1:kp),zn(1:kp), &
 						t(1:kp,1:ip),u(1:kp,1:ip),w(1:kp,1:ip),new_file)
@@ -149,7 +151,7 @@
 
 
         ! solve microphysics. initialise constants that are commonly used, if needed
-        if (microphysics_flag) then
+        if (microphysics_flag .eq. 1) then
 			call microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
 						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice)			

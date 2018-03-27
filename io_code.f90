@@ -13,11 +13,12 @@
 	!>output 1 time-step of model
 	!>@param[in] time in seconds
 	!>@param[in] nq number of q fields
+	!>@param[in] nprec number of precipitation fields
 	!>@param[in] ip number of horizontal levels
 	!>@param[in] kp number of vertical levels
 	!>@param[in] q, precip, theta, pressure, x,xn,z,zn, temperature,u,w
 	!>@param[inout] new_file
-    subroutine output_2d(time,nq,ip,kp,q,precip,theta,p,x,xn,z,zn,t,u,w,new_file)
+    subroutine output_2d(time,nq,nprec,ip,kp,q,precip,theta,p,x,xn,z,zn,t,u,w,new_file)
 
     use nrtype
     use netcdf
@@ -25,9 +26,9 @@
 
     implicit none
     real(sp), intent(in) :: time
-    integer(i4b), intent(in) :: nq,kp,ip
+    integer(i4b), intent(in) :: nq,nprec,kp,ip
     real(sp), dimension(nq,kp,ip), intent(in) :: q
-    real(sp), dimension(4,kp,ip), intent(in) :: precip
+    real(sp), dimension(nprec,kp,ip), intent(in) :: precip
     real(sp), dimension(kp,ip), intent(in) :: theta, p, t, u, w
     real(sp), dimension(ip), intent(in) :: x,xn
     real(sp), dimension(kp), intent(in) :: z,zn
@@ -44,7 +45,7 @@
         ! define dimensions (netcdf hands back a handle)
         call check( nf90_def_dim(io1%ncid, "times", NF90_UNLIMITED, io1%x_dimid) )
         call check( nf90_def_dim(io1%ncid, "nq", nq, io1%nq_dimid) )
-        call check( nf90_def_dim(io1%ncid, "nprec", 4, io1%nprec_dimid) )
+        call check( nf90_def_dim(io1%ncid, "nprec", nprec, io1%nprec_dimid) )
         call check( nf90_def_dim(io1%ncid, "ip", ip, io1%i_dimid) )
         call check( nf90_def_dim(io1%ncid, "kp", kp, io1%k_dimid) )
 

@@ -54,28 +54,30 @@
         type(io) :: io1
 
         ! constants
-        integer(i4b), parameter :: nq = 11, nlevels_r=1000
-        integer(i4b), parameter :: qv=1,qc=2,qr=3,nqc=4,nqr=5,qi=6,qs=7,qg=8, &
-                                   nqi=9,nqs=10,nqg=11
-        ! the type of q-variable. 0 vapour, 1 mass, 2 number conc.
-        integer(i4b), dimension(nq) :: q_type=(/0,1,1,1,1,1,2,2,2,2,2/)
-        ! the type of q-variable. 0 vapour, 1 mass, 2 number conc.
-        logical, dimension(nq) :: q_init=(/.true.,.false.,.false.,.false., &
-                                            .false.,.false.,.false.,.false., &
-                                            .false.,.false.,.false./)
+        integer(i4b), parameter :: nlevels_r=1000
         logical :: micro_init=.true., adiabatic_prof=.false.
         real(sp) :: adiabatic_frac
-        logical :: monotone=.true.,microphysics_flag=.true.,theta_flag=.false., &
+        logical :: monotone=.true.,theta_flag=.false., &
         			hm_flag=.true.
-		integer(i4b) :: advection_scheme=0
+		integer(i4b) :: advection_scheme=0,microphysics_flag=0
 
         ! variables for model
-        real(sp), dimension(nq,nlevels_r) :: q_read
+        real(sp), allocatable,dimension(:,:) :: q_read ! nq x nlevels_r
         real(sp), dimension(nlevels_r) :: theta_read,rh_read, &
                   z_read
         real(sp) :: dx, dz,dt, runtime, psurf, theta_surf,tsurf, t_cbase, t_ctop, t_thresh, &
         			t_thresh2, w_cb, theta_q_sat,t1old, p111, num_ice, mass_ice
         integer(i4b) :: ip,kp, n_levels_s, ord, o_halo,halo, updraft_type
+        logical :: ice_init=.true.
+        integer(i4b) :: nq = 9, qv=1,qc=2,qr=3,nqc=-1,nqr=-1,qs=4,qg=5,qi=6, &
+                                   nqi=7,nqs=8,nqg=9, nprec=4
+        
+        ! the type of q-variable. 0 vapour, 1 mass, 2 number conc.
+        integer(i4b), allocatable, dimension(:) :: q_type !=(/0,1,1,1,1,1,2,2,2,2,2/)
+        ! whether to initialise or not
+        logical, allocatable, dimension(:) :: q_init !=(/.true.,.false.,.false.,.false., &
+                                            !.false.,.false.,.false.,.false., &
+                                            !.false.,.false.,.false./)
         character (len=200) :: outputfile='output'
         
         

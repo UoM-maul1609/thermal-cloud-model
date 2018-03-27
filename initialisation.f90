@@ -8,8 +8,40 @@
     use nrtype
 !    use variables
     private
-    public :: calc_profile_2d
+    public :: calc_profile_2d, allocate_arrays
     contains
+    
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>allocate arrays for q_type and q_init
+	!>@param[in] nq number of q fields
+	!>@param[in] n_levels number of levels for reading in sounding
+	!>@param[inout] q_type: integer array
+	!>@param[inout] q_init: logical array
+	!>@param[inout] q_read: real array
+    subroutine allocate_arrays(nq,n_levels,q_type,q_init,q_read)
+    use nrtype
+    implicit none
+    integer(i4b), intent(in) :: nq, n_levels
+    integer(i4b), dimension(:), allocatable, intent(inout) :: q_type
+    logical, dimension(:), allocatable, intent(inout) :: q_init
+    real(sp), dimension(:,:), allocatable, intent(inout) :: q_read
+    ! local variables:
+    integer(i4b) :: AllocateStatus
+    
+    ! allocate arrays
+    allocate( q_type(1:nq), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( q_init(1:nq), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( q_read(1:nq,1:n_levels), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    
+    
+    end subroutine allocate_arrays
+    
+    
     
     
 	!>@author
@@ -17,6 +49,7 @@
 	!>@brief
 	!>interpolates the sounding to the grid
 	!>@param[in] nq number of q fields
+	!>@param[in] nprec number of precipitation arrays
 	!>@param[in] n_levels number levels for sounding
 	!>@param[in] psurf surface pressure
 	!>@param[in] tsurf surface temperature
@@ -35,13 +68,14 @@
 	!>@param[in] dx horizontal resolution of grid
 	!>@param[in] dz vertical resolution of grid
 	!>@param[inout] q, precip, theta, pressure, x,xn,z,zn, temperature, rho,u,w
+	!>@param[in] ice_init: flag to initialise ice crystals in model
 	!>@param[in] number conc of ice crystals #/kg
 	!>@param[in] mass of a single ice crystal kg.
-    subroutine calc_profile_2d(nq,n_levels,psurf,tsurf,t_cbase, &
+    subroutine calc_profile_2d(nq,nprec,n_levels,psurf,tsurf,t_cbase, &
     						t_ctop, adiabatic_prof, adiabatic_frac,q_type,q_init, &
                              z_read,theta_read,q_read, &
                              ip,kp,o_halo,dx,dz,q,precip,theta,p,x,xn,z,zn,t,rho,u,w, &
-                             num_ice, mass_ice)
+                             ice_init, num_ice, mass_ice)
     use nrtype
     use nr, only : locate, polint, rkqs, odeint, zbrent
     use constants
@@ -50,14 +84,14 @@
 
     implicit none
     ! inputs
-    integer(i4b), intent(in) :: n_levels, nq,o_halo
+    integer(i4b), intent(in) :: n_levels, nq,o_halo, nprec
     real(sp), dimension(n_levels), intent(in) :: z_read, theta_read
     real(sp), dimension(nq,n_levels), intent(in) :: q_read
     integer(i4b), dimension(nq), intent(in) :: q_type
     logical, dimension(nq), intent(in) :: q_init
     integer(i4b), intent(in) :: ip, kp
     real(sp), intent(in) :: dx, dz, psurf, tsurf, t_cbase, t_ctop
-    logical, intent(in) :: adiabatic_prof
+    logical, intent(in) :: adiabatic_prof, ice_init
     real(sp), intent(in) :: adiabatic_frac
     real(sp), intent(in) :: num_ice, mass_ice
     ! inouts
@@ -72,7 +106,7 @@
 	real(sp) :: htry,hmin,eps2,p1,p2,p_ctop,z11,z22,theta1
 
     ! allocate arrays
-    allocate( precip(1:4,1:kp,1:ip), STAT = AllocateStatus)
+    allocate( precip(1:nprec,1:kp,1:ip), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( q(1:nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -213,10 +247,12 @@
 		t(istore2:kp+o_halo,:)=theta1*(p(istore2:kp+o_halo,:)/1.e5_sp)**(ra/cp)
 
 		! initialise ice crystals
-		where(t(istore:istore2,:).lt.ttr)
-			q(6,istore:istore2,:)=num_ice*mass_ice
-			q(7,istore:istore2,:)=num_ice
-		end where
+		if(ice_init) then
+            where(t(istore:istore2,:).lt.ttr)
+                q(6,istore:istore2,:)=num_ice*mass_ice
+                q(7,istore:istore2,:)=num_ice
+            end where
+        endif
 	else
 		! use linear interpolation to put sounding on grid:
 		do i=-o_halo+1,kp+o_halo
