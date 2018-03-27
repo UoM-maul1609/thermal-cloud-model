@@ -15,7 +15,7 @@
     use nrtype
     
     private
-    public :: microphysics_2d, microphysics_1d, svp_liq
+    public :: microphysics_2d, microphysics_1d
     
     ! physical constants
     real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
