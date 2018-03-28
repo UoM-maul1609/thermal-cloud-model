@@ -12,12 +12,12 @@
 		real(sp) :: rhinit,tinit,pinit,w,  &
 							mass_dummy,density_dummy,n_dummy,sig_dummy,d_dummy, &
 							tcb, pcb,xmin,a,smax, &
-							alpha_sup, sigma_sup, g, chi, sd_dummy, s,c0   ! private
+							alpha_sup, sigma_sup, g, chi, sd_dummy, s,c0   
 		! size n_mode
 		real(sp), allocatable, dimension(:) :: n_aer1, sig_aer1, d_aer1, &
 										n_aer, sig_aer, d_aer, d_aer_new, sgi, &
-										density_final,mass_initial, & !public
-									   mass_final,sd,b,sm,eta,f1,f2 ! private
+										density_final,mass_initial, & 
+									   mass_final,sd,b,sm,eta,f1,f2 
 							  
 		! size n_mode
 		real(sp), allocatable, dimension(:) :: density_core, & 
@@ -40,7 +40,8 @@
 		integer(i4b) :: n_mode_s		! private
 		real(sp) :: p_test, t_test, w_test, a_eq_7, b_eq_7 ! public
 		
-		integer(i4b) :: n_mode, n_sv, method_flag, giant_flag, sv_flag ! 1=abdul-razzak, ghan; 2=fountoukis and nenes; 3=fountoukis and nenes with quad
+		integer(i4b) :: n_mode, n_sv, method_flag, giant_flag, sv_flag 
+		! 1=abdul-razzak, ghan; 2=fountoukis and nenes; 3=fountoukis and nenes with quad
 	
 	private 
 	public :: ctmm_activation, allocate_arrays, initialise_arrays, &
@@ -185,7 +186,7 @@
 			mass_final=mass_initial
 			density_final=density_core
 		endif
-		
+
 		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! now calculate the activated fraction                                           !
@@ -592,7 +593,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 		cstar = 10._sp**log_c_star1* (298.15_sp/t1) * &
-					exp(-delta_h_vap1*1.e3_sp/r_gas *(1._sp/t1-1._sp/298.15_sp))
+					exp(-delta_h_vap1*1.e3_sp/r_gas *(1._sp/t1-1._sp/298.15_sp))/1.e9_sp
 										 ! c* needs to be adjusted by delta_h_vap / t
 		c_ions=org_content1*nu_org1/molw_org1 ! c - all ions
 		c0=sum(mass_core1*nu_core1/molw_core1)  ! number of "core" ions
@@ -608,6 +609,7 @@
 		c_c=c_ions*epsilon1   ! condensed
 
 		mass_org_condensed1=c_c/nu_org1*molw_org1
+		
 	end subroutine solve_semivolatiles
 	
 	
