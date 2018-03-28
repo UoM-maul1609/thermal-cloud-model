@@ -25,7 +25,7 @@
  	p_test            = 99344.,
  	t_test            = 280.15,
  	w_test            = 0.1,
- 	rand_dist         = .true.,  ! set to true if you want to calculate random samples
+ 	rand_dist         = .false.,  ! set to true if you want to calculate random samples
  	n_rand            = 100000,
  	mean_w            = 0.,
  	sigma_w           = 1./

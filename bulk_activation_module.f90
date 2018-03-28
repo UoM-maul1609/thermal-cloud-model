@@ -187,8 +187,6 @@
 		endif
 		
 		
-		
-
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! now calculate the activated fraction                                           !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -586,7 +584,6 @@
 		
 		
 		! set variables in module (for passing to optimizer)
-		org_content=org_content1
 		nu_org=nu_org1
 		molw_org=molw_org1
 		nu_core=nu_core1
