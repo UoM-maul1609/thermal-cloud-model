@@ -23,7 +23,7 @@
         use random, only : random_normal
         use sub, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
         		act_frac2, &
-        		n_aer, d_aer, sig_aer, molw_core, density_core, nu_core, org_content, &
+        		n_aer1, d_aer1, sig_aer1, molw_core, density_core, nu_core, org_content1, &
         		molw_org, density_org, delta_h_vap, nu_org, log_c_star, p_test, t_test, &
         		w_test, act_frac,mass_initial, mass_org_condensed, &
         		a_eq_7, b_eq_7, &
@@ -52,8 +52,8 @@
         namelist /bulk_aerosol_setup/ n_mode, n_sv, sv_flag, method_flag, giant_flag, &
         			a_eq_7, b_eq_7      
         ! run parameters / input arrays
-        namelist /bulk_aerosol_spec/ n_aer, d_aer, sig_aer, molw_core, density_core, &
-        					nu_core, org_content, molw_org, density_org, &
+        namelist /bulk_aerosol_spec/ n_aer1, d_aer1, sig_aer1, molw_core, density_core, &
+        					nu_core, org_content1, molw_org, density_org, &
         					delta_h_vap, &
         					nu_org, log_c_star, p_test, t_test, w_test, &
         					rand_dist, n_rand, mean_w,sigma_w
@@ -83,7 +83,8 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! initialise arrays								                       !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		call initialise_arrays(n_mode,p_test,t_test,w_test)
+		call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
+					n_aer1,d_aer1,sig_aer1)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 
@@ -93,13 +94,13 @@
         if(.not. rand_dist) then
         	print *,'act_frac1, n_act'
 			call ctmm_activation(n_mode,n_sv,sv_flag, &
-								n_aer, d_aer,sig_aer,molw_core, &
+								n_aer1, d_aer1,sig_aer1,molw_core, &
 								density_core, nu_core, &
-								org_content,molw_org, density_org, delta_h_vap, nu_org,  &
+								org_content1,molw_org, density_org, delta_h_vap, nu_org,  &
 								log_c_star, &
 								w_test, t_test,p_test, &
 								act_frac)
-			print *,act_frac,  sum(act_frac*n_aer)
+			print *,act_frac,  sum(act_frac*n_aer1)
 		else
 			! random number generator
 			call random_seed(size=l)
@@ -119,20 +120,22 @@
 				r=r+mean_w
 				r=abs(r) ! only positive values
 				w_test=r
-				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				! initialise arrays								                   !
-				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				call initialise_arrays(n_mode,p_test,t_test,w_test)
-				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				
+				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				! initialise arrays								                       !
+				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
+							n_aer1,d_aer1,sig_aer1)
+				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				
 				call ctmm_activation(n_mode,n_sv,sv_flag, &
-									n_aer, d_aer,sig_aer,molw_core, &
+									n_aer1, d_aer1,sig_aer1,molw_core, &
 									density_core, nu_core, &
-									org_content,molw_org, density_org, delta_h_vap, nu_org,  &
+									org_content1,molw_org, density_org, delta_h_vap, nu_org,  &
 									log_c_star, &
 									w_test, t_test,p_test, &
 									act_frac)
-				print *,w_test,act_frac,  sum(act_frac*n_aer)
+				print *,w_test,act_frac,  sum(act_frac*n_aer1)
 			enddo
 			deallocate(seed)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

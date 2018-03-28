@@ -14,7 +14,8 @@
 							tcb, pcb,xmin,a,smax, &
 							alpha_sup, sigma_sup, g, chi, sd_dummy, s,c0   ! private
 		! size n_mode
-		real(sp), allocatable, dimension(:) :: n_aer, sig_aer, d_aer, d_aer_new, sgi, &
+		real(sp), allocatable, dimension(:) :: n_aer1, sig_aer1, d_aer1, &
+										n_aer, sig_aer, d_aer, d_aer_new, sgi, &
 										density_final,mass_initial, & !public
 									   mass_final,sd,b,sm,eta,f1,f2 ! private
 							  
@@ -24,7 +25,7 @@
 								  nu_core,act_frac,act_frac2 
 		! size n_sv
 		real(sp), allocatable, dimension(:) :: molw_org, r_org, log_c_star, cstar, &
-												org_content, &
+												org_content, org_content1, &
 											  density_org,nu_org,mass_org_condensed, &
 											  p_i_0,delta_h_vap, epsilon1, c_ions
 		real(sp), dimension(6) :: c1	! private
@@ -68,7 +69,7 @@
 	!>@param[in] w1, t1, p1: vertical wind, temperature, pressure
 	!>@param[inout] act_frac1: activated fraction in each mode
 	!>@param[in] runtime
-	subroutine ctmm_activation(n_modes1,n_sv1,sv_flag, n_aer,d_aer,sig_aer,molw_core, &
+	subroutine ctmm_activation(n_modes1,n_sv1,sv_flag, n_aer1,d_aer1,sig_aer1,molw_core, &
 							   density_core, nu_core, org_content1, &
 							   molw_org1, density_org1, delta_h_vap1, nu_org1,  &
                                log_c_star1, &
@@ -78,7 +79,7 @@
 		use nrtype1
 		use nr1, only : zbrent,qsimp,qromb,brent,midpnt
 		implicit none 
-			  real(sp), dimension(:), intent(inout) :: n_aer,d_aer, sig_aer, molw_core, &
+			  real(sp), dimension(:), intent(inout) :: n_aer1,d_aer1, sig_aer1, molw_core, &
 													density_core, nu_core
 			  real(sp), dimension(:), intent(in) :: org_content1  , molw_org1, &
 			  							density_org1, delta_h_vap1, nu_org1, log_c_star1                               
@@ -89,17 +90,20 @@
 		integer(i4b):: i
 		
 		n_mode_s=n_modes1
-
+		n_aer=n_aer1
+		d_aer=d_aer1
+		sig_aer=sig_aer1
 
 
 		
 		if(sv_flag.eq.1) then
+			org_content=org_content1*1e-9_sp/(p1/r_air/t1) ! kg/kg
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! Find how much semi-volatile is condensed
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call solve_semivolatiles(n_modes1,n_sv1, &
-					org_content1, log_c_star1, delta_h_vap1, nu_org1, molw_org1, &
+					org_content, log_c_star1, delta_h_vap1, nu_org1, molw_org1, &
 					mass_initial, nu_core, molw_core,rhinit, t1, &
 					mass_org_condensed)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -649,6 +653,12 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( sig_aer(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( n_aer1(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( d_aer1(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( sig_aer1(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( d_aer_new(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( sgi(1:n_mode), STAT = AllocateStatus)
@@ -696,6 +706,8 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( org_content(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( org_content1(1:n_sv), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( density_org(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( nu_org(1:n_sv), STAT = AllocateStatus)
@@ -715,14 +727,20 @@
 	!>@brief
 	!>initialise arrays for activation code
 	!>@param[in] n_modes: number of aerosol modes
+	!>@param[in] n_sv: number of volatility bins
 	!>@param[in] p1: pressure (Pa)
 	!>@param[in] t1: temperature (K)
 	!>@param[in] w1: vertical wind (m/s)
-	subroutine initialise_arrays(n_modes,p1,t1,w1)
+	!>@param[in] n_aer1: number concentration in modes
+	!>@param[in] d_aer1: diameter in modes
+	!>@param[in] sig_aer1: geometric standard deviation in modes
+	subroutine initialise_arrays(n_modes,n_sv,p1,t1,w1,n_aer1, &
+								d_aer1,sig_aer1)
 		use nrtype1
 		implicit none
-		integer(i4b), intent(in) :: n_modes
+		integer(i4b), intent(in) :: n_modes, n_sv
 		real(sp), intent(in) :: p1,t1,w1
+		real(sp), dimension(n_modes), intent(in) :: n_aer1,d_aer1,sig_aer1
 		
 		integer(i4b) :: i
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -733,6 +751,9 @@
 		pinit=p1                                       ! pascals
 		tinit=t1                                       ! kelvin
 		w    =w1                                       ! m s-1
+		n_aer=n_aer1
+		d_aer=d_aer1
+		sig_aer=sig_aer1
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 		
@@ -741,7 +762,6 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! define the organic properties                                                  !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		org_content=org_content*1e-9_sp/(pinit/r_air/tinit) ! kg/kg
 		!log_c_star=(/(i,i=-0,3)/)                      ! watch out for type?
 		!nu_org=1._sp                                    ! disociation factor
 		!molw_org=200e-3_sp                                ! kg per mol
