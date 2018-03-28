@@ -269,12 +269,22 @@
 			  q_kp1(k,i)=q_k_old(k,i)-(fip-fim)
 			enddo
 		enddo
+		! halos
+		q_kp1(:,-o_halo+1:0)=q_kp1(:,ip-o_halo+1:ip)
+		q_kp1(:,ip+1:ip+o_halo)=q_kp1(:,1:o_halo)
+		! update
 		q_k_old(-o_halo+2:kp+o_halo-1,-o_halo+2:ip+o_halo-1)= &
 		       q_kp1(-o_halo+2:kp+o_halo-1,-o_halo+2:ip+o_halo-1)
+        ! halos
+		q_k_old(:,-o_halo+1:0)=q_k_old(:,ip-o_halo+1:ip)
+		q_k_old(:,ip+1:ip+o_halo)=q_k_old(:,1:o_halo)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	enddo
 	q_k(1:kp,1:ip)=q_k_old(1:kp,1:ip)
 
+    ! halos
+    q_k(:,-o_halo+1:0)=q_k(:,ip-o_halo+1:ip)
+    q_k(:,ip+1:ip+o_halo)=q_k(:,1:o_halo)
 
 	end subroutine mpdata
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

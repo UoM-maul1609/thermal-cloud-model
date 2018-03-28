@@ -138,6 +138,7 @@
     zn=z+0.5_sp*dz
     ! set up horizontal level array
     x=dx*(/(i,i=-o_halo,ip+o_halo-1)/)!-0.5_sp*dx
+    x=x+0.5_sp*dx
     xn=x+0.5_sp*dx
 
 	q=0._sp

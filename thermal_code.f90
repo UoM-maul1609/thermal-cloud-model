@@ -85,7 +85,7 @@
 
 	wcen=0._sp	
 	! order of nested do loop is 2nd dimension first
-	do i=1,ip
+	do i=0,ip
 		do j=-1,kp
 			! equation 39 of ZZRA:
 ! 			zz(j,i)=k*n_bar_mac* &
@@ -122,7 +122,7 @@
 				test3=((z(j)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
-				test2=n_bar_mac* sqrt(test2) *cos(k*x(i))
+				test2=n_bar_mac* sqrt(test2) *cos(k*(x(i)))
 				wcen(j,i)=real(test2)
 				
 				
@@ -136,7 +136,8 @@
 	! calculate u via finite difference
 	wcen(0,:)=wcen(1,:)
 	u=0._sp
-	do i=2,ip
+	
+	do i=1,ip
 		u(1:kp,i)=u(1:kp,i-1)-(wcen(1:kp,i)-wcen(0:kp-1,i))*dx/dz
 	enddo
 	w(1:kp,1:ip)=(wcen(1:kp,1:ip))
@@ -145,6 +146,8 @@
 	! halos
 	u(1:kp,-o_halo+1:0)=u(1:kp,ip-o_halo+1:ip)
  	u(1:kp,ip+1:ip+o_halo)=u(1:kp,1:o_halo)
+	w(1:kp,-o_halo+1:0)=w(1:kp,ip-o_halo+1:ip)
+ 	w(1:kp,ip+1:ip+o_halo)=w(1:kp,1:o_halo)
 	do j=-o_halo+1,0
 		u(j,:)=u(1,:)
 		w(j,:)=w(1,:)
@@ -226,7 +229,7 @@
 	endif
 	
 	! order of nested do loop is 2nd dimension first
-	do i=1,ip
+	do i=0,ip
 		do j=1,kp
 			! equation 39 of ZZRA:
 			zz(j,i)=k*n_bar_mac* &

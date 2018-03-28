@@ -81,7 +81,6 @@
     integer(i4b) :: nt, i, j, nsteps, iter
     real(sp) :: time
 
-
     nt=ceiling(runtime / real(dt,kind=sp) )
     do i=1,nt
     	time=real(i-1,sp)*dt
@@ -92,7 +91,6 @@
 		call thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc, &
 						b,del_gamma_mac,del_c_s,del_c_t, &
     						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)   	
-    	
         ! output:
         call output_2d(time,nq,nprec,ip,kp,q(:,1:kp,1:ip),precip(:,1:kp,1:ip), &
 						theta(1:kp,1:ip),p(1:kp,1:ip), &
