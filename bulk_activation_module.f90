@@ -22,12 +22,19 @@
 		! size n_mode
 		real(sp), allocatable, dimension(:) :: density_core, & 
 								  molw_core, & 
-								  nu_core,act_frac,act_frac2 
+								  nu_core,act_frac,act_frac1, act_frac2 , &
+								  density_core1, & 
+								  molw_core1, & 
+								  nu_core1
 		! size n_sv
 		real(sp), allocatable, dimension(:) :: molw_org, r_org, log_c_star, cstar, &
 												org_content, org_content1, &
 											  density_org,nu_org,mass_org_condensed, &
-											  p_i_0,delta_h_vap, epsilon1, c_ions
+											  delta_h_vap, epsilon1, c_ions, &
+											  molw_org1, log_c_star1, &
+											  density_org1,nu_org1,&
+											  delta_h_vap1
+											  
 		real(sp), dimension(6) :: c1	! private
 		logical(lgt) :: check			! private
 		integer(i4b) :: n_mode_s		! private
@@ -35,19 +42,12 @@
 		
 		integer(i4b) :: n_mode, n_sv, method_flag, giant_flag, sv_flag ! 1=abdul-razzak, ghan; 2=fountoukis and nenes; 3=fountoukis and nenes with quad
 	
-	public
-	private :: dd, ka, fountoukis_nenes, dry_potential, svp, ln3, mass_integrate, &
-				find_sig_aer, integral3_fn, &
-				rhinit,tinit,pinit,w,  &
-				mass_dummy,density_dummy,n_dummy,sig_dummy,d_dummy, &
-				tcb, pcb,xmin,a,smax, &
-				alpha_sup, sigma_sup, g, chi, sd_dummy, &
-				c1, check, n_mode_s, &
-				grav, lv,cp,molw_air,     &
-				r_air,r_vap,r_gas,molw_vap, &
-				eps,kappa,rhow,sigma, &
-				mass_final,sd,b,sm,eta,f1,f2, &
-				s, cstar, epsilon1, c_ions, c0
+	private 
+	public :: ctmm_activation, allocate_arrays, initialise_arrays, &
+		n_mode, n_sv, method_flag, giant_flag, sv_flag, &
+		p_test, t_test, w_test, a_eq_7, b_eq_7, n_aer1, d_aer1, sig_aer1, &
+		org_content1, molw_org1, log_c_star1, density_org1, nu_org1, delta_h_vap1, &
+		molw_core1, density_core1, nu_core1, act_frac1
 				
 	contains
 	!>@author
@@ -65,25 +65,24 @@
 	!>@param[in] density_org1: density of organic in volatility bins
 	!>@param[in] delta_h_vap1: enthalpy change in volatility bins
 	!>@param[in] nu_org1: van hoff factor in volatility bins
-	!>@param[in] log_c_star: volatility bins
-	!>@param[in] w1, t1, p1: vertical wind, temperature, pressure
+	!>@param[in] log_c_star1: volatility bins
+	!>@param[in] w1, t1, p1, a, b: vertical wind, temperature, pressure + params in ARG
 	!>@param[inout] act_frac1: activated fraction in each mode
-	!>@param[in] runtime
-	subroutine ctmm_activation(n_modes1,n_sv1,sv_flag, n_aer1,d_aer1,sig_aer1,molw_core, &
-							   density_core, nu_core, org_content1, &
+	subroutine ctmm_activation(n_modes1,n_sv1,sv_flag, n_aer1,d_aer1,sig_aer1,molw_core1, &
+							   density_core1, nu_core1, org_content1, &
 							   molw_org1, density_org1, delta_h_vap1, nu_org1,  &
                                log_c_star1, &
-                               w1, t1,p1, &
+                               w1, t1,p1,a_arg,b_arg, &
 							   act_frac1 )
 
 		use nrtype1
 		use nr1, only : zbrent,qsimp,qromb,brent,midpnt
 		implicit none 
-			  real(sp), dimension(:), intent(inout) :: n_aer1,d_aer1, sig_aer1, molw_core, &
-													density_core, nu_core
+			  real(sp), dimension(:), intent(inout) :: n_aer1,d_aer1, sig_aer1, molw_core1, &
+													density_core1, nu_core1
 			  real(sp), dimension(:), intent(in) :: org_content1  , molw_org1, &
 			  							density_org1, delta_h_vap1, nu_org1, log_c_star1                               
-			  real(sp), intent(in) :: w1,t1,p1
+			  real(sp), intent(in) :: w1,t1,p1, a_arg, b_arg
 			  integer, intent(in) :: n_modes1, n_sv1, sv_flag
 			  real(sp), dimension(:), intent(inout) :: act_frac1
 
@@ -93,17 +92,26 @@
 		n_aer=n_aer1
 		d_aer=d_aer1
 		sig_aer=sig_aer1
+		molw_core=molw_core1
+		density_core=density_core1
+		nu_core=nu_core1
+		
 
+		org_content=org_content1*1e-9_sp/(p1/r_air/t1) ! kg/kg
+		molw_org=molw_org1
+		density_org=density_org1
+		delta_h_vap=delta_h_vap1
+		nu_org=nu_org1
+		log_c_star=log_c_star1
 
 		
 		if(sv_flag.eq.1) then
-			org_content=org_content1*1e-9_sp/(p1/r_air/t1) ! kg/kg
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! Find how much semi-volatile is condensed
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call solve_semivolatiles(n_modes1,n_sv1, &
-					org_content, log_c_star1, delta_h_vap1, nu_org1, molw_org1, &
+					org_content, log_c_star, delta_h_vap, nu_org, molw_org, &
 					mass_initial, nu_core, molw_core,rhinit, t1, &
 					mass_org_condensed)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -124,7 +132,7 @@
 			! calculate the new density - this is wrong - Crooks has a 
 			! better method
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			density_final=mass_initial/density_core+sum(mass_org_condensed/density_org1) * &
+			density_final=mass_initial/density_core+sum(mass_org_condensed/density_org) * &
 													n_aer/sum(n_aer(1:n_modes1))
 			density_final=mass_final/density_final
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -190,7 +198,7 @@
   
 			b=density_final/ &
 			  ( (molw_core*mass_initial/nu_core+ & 
-			  sum(molw_org1*mass_org_condensed/nu_org1)* &
+			  sum(molw_org*mass_org_condensed/nu_org)* &
 			    mass_initial/sum(mass_initial(1:n_modes1))) / &
 			  mass_final)/(rhow/molw_vap)                       ! eq 6: abdul-razzak, ghan
 			sm=2._sp/sqrt(b)*(a/(3._sp*d_aer/2._sp))**1.5_sp    ! eq 8: abdul-razzak, ghan 
@@ -215,7 +223,7 @@
 															   ! or 10: of 2000 paper
  
 			! f1=1.5_sp*exp(2.25_sp*sig_aer**2)                ! eq 28: abdul-razzak, ghan
-			f1=a_eq_7*exp(b_eq_7*sig_aer**2)                  ! or 7 : of 2000 paper 
+			f1=a_arg*exp(b_arg*sig_aer**2)                  ! or 7 : of 2000 paper 
 															   ! a=0.5, b=2.5
 										
 		    f2=1._sp+0.25_sp*sig_aer                          ! eq 29: abdul-razzak, ghan
@@ -235,7 +243,7 @@
 			!       f2*(sm**2/eta)**0.75)**0.5
 			! smax=sm/smax                                     ! eq 31: abdul-razzak, ghan
 
-			act_frac=1._sp/sum(n_aer(1:n_modes1))* &
+			act_frac1=1._sp/sum(n_aer(1:n_modes1))* &
 			          sum(n_aer(1:n_modes1)*5.e-1_sp*(1._sp- &
 			          erf(2._sp*log(sm(1:n_modes1)/smax)/ &
 			          (3._sp*sqrt(2._sp)*sig_aer(1:n_modes1)) )))   ! eq 13: of 2000 paper
@@ -249,7 +257,7 @@
   
 			b=density_final/ &
 			  ( (molw_core*mass_initial/nu_core+ & 
-			  sum(molw_org1*mass_org_condensed/nu_org1)* &
+			  sum(molw_org*mass_org_condensed/nu_org)* &
 			  	mass_initial/sum(mass_initial(1:n_modes1))) / &
 			  	mass_final)/(rhow/molw_vap)                   ! eq 6: abdul-razzak, ghan
 
@@ -261,7 +269,7 @@
 
 			!act_frac=sum(0.5_sp*&
 			!   erfc(2_sp*log(sgi/smax)/(3_sp*sqrt(2_sp)*sig_aer))) ! eq 8 and 9 f+n 
-			act_frac=1._sp/sum(n_aer(1:n_modes1))*&
+			act_frac1=1._sp/sum(n_aer(1:n_modes1))*&
 			 sum(n_aer(1:n_modes1)*5.e-1_sp*(1._sp- &
 			 erf(2._sp*log(sgi(1:n_modes1)/smax)/ &
 			 (3._sp*sqrt(2._sp)*sig_aer(1:n_modes1)) )))   ! eq 13: of 2000 paper
@@ -560,7 +568,7 @@
 	subroutine solve_semivolatiles(n_modes1,n_sv1, &
 					org_content1, log_c_star1, delta_h_vap1, &
 					nu_org1, molw_org1, &
-					mass_core, nu_core1, molw_core1,s1, t1, &
+					mass_core1, nu_core1, molw_core1,s1, t1, &
 					mass_org_condensed1)
 		use nrtype1
 		use nr1, only : zbrent, brent
@@ -568,7 +576,7 @@
 		integer(i4b), intent(in) :: n_modes1, n_sv1
 		real(sp), dimension(n_sv1), intent(in) :: org_content1, nu_org1, molw_org1, &
 							log_c_star1, delta_h_vap1
-		real(sp), dimension(n_modes1), intent(in) :: mass_core, nu_core1, molw_core1
+		real(sp), dimension(n_modes1), intent(in) :: mass_core1, nu_core1, molw_core1
 		real(sp), intent(in) :: s1, t1
 		real(sp), dimension(n_sv1), intent(inout) :: mass_org_condensed1
 		
@@ -589,8 +597,8 @@
 		cstar = 10._sp**log_c_star1* (298.15_sp/t1) * &
 					exp(-delta_h_vap1*1.e3_sp/r_gas *(1._sp/t1-1._sp/298.15_sp))
 										 ! c* needs to be adjusted by delta_h_vap / t
-		c_ions=org_content*nu_org/molw_org ! c - all ions
-		c0=sum(mass_core*nu_core/molw_core)  ! number of "core" ions
+		c_ions=org_content1*nu_org1/molw_org1 ! c - all ions
+		c0=sum(mass_core1*nu_core1/molw_core1)  ! number of "core" ions
 		ct=1._sp/(1._sp-s)*(sum(c_ions)+c0)  ! equation 5 from Crooks et al. (2016, GMD)
 										! basically saturation ratio is mole fraction
 		! ct is the total concentration of all ions in the condensed phase
@@ -602,7 +610,7 @@
 		epsilon1=(1._sp+cstar/ct)**(-1) ! partitioning coefficients
 		c_c=c_ions*epsilon1   ! condensed
 
-		mass_org_condensed1=c_c/nu_org*molw_org
+		mass_org_condensed1=c_c/nu_org1*molw_org1
 	end subroutine solve_semivolatiles
 	
 	
@@ -641,10 +649,29 @@
 	!>allocate arrays for activation code
 	!>@param[in] n_modes: number of aerosol modes
 	!>@param[in] n_sv: number of organic / volatility modes
-	subroutine allocate_arrays(n_mode, n_sv)
+	!>@param[inout] n_aer1: number in modes
+	!>@param[inout] d_aer1: diameter in modes
+	!>@param[inout] sig_aer1: geo std in modes
+	!>@param[inout] molw_core1:molw in core
+	!>@param[inout] density_core1: solute density
+	!>@param[inout] nu_core1: van hoff factor
+	!>@param[inout] org_content1: organic content in vol bins
+	!>@param[inout] molw_org1: molw in volatility bins
+	!>@param[inout] density_org1: density in volatility bins
+	!>@param[inout] delta_h_vap1: enthalpy in volatility bins
+	!>@param[inout] nu_org1: van hoff factor in volatility bins
+	!>@param[inout] log_c_star1: log_c_star in volatility bins
+	!>@param[inout] act_frac1: activated fraction in modes
+	subroutine allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
+			molw_core1,density_core1,nu_core1,org_content1, &
+			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, act_frac1)
 		use nrtype1
 		implicit none
 		integer(i4b), intent(in) :: n_mode, n_sv
+		real(sp), dimension(:), allocatable, intent(inout) :: n_aer1,d_aer1,sig_aer1, &
+							molw_core1, density_core1, nu_core1, org_content1, &
+							molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, &
+							act_frac1
 		
 		integer(i4b) :: AllocateStatus
 		allocate( n_aer(1:n_mode), STAT = AllocateStatus)
@@ -683,20 +710,32 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( density_core(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( density_core1(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( molw_core(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( molw_core1(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( nu_core(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( nu_core1(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( act_frac(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( act_frac1(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( act_frac2(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		
 		allocate( molw_org(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( molw_org1(1:n_sv), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( r_org(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( log_c_star(1:n_sv), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( log_c_star1(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( cstar(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
@@ -710,13 +749,17 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( density_org(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( density_org1(1:n_sv), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( nu_org(1:n_sv), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( nu_org1(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( mass_org_condensed(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
-		allocate( p_i_0(1:n_sv), STAT = AllocateStatus)
-		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( delta_h_vap(1:n_sv), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( delta_h_vap1(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		
 	
@@ -734,13 +777,16 @@
 	!>@param[in] n_aer1: number concentration in modes
 	!>@param[in] d_aer1: diameter in modes
 	!>@param[in] sig_aer1: geometric standard deviation in modes
+	!>@param[in] molw_org1: molecular weight in volatility bins
+	!>@param[in] density_core1: density in modes
 	subroutine initialise_arrays(n_modes,n_sv,p1,t1,w1,n_aer1, &
-								d_aer1,sig_aer1)
+								d_aer1,sig_aer1, molw_org1,density_core1)
 		use nrtype1
 		implicit none
 		integer(i4b), intent(in) :: n_modes, n_sv
 		real(sp), intent(in) :: p1,t1,w1
-		real(sp), dimension(n_modes), intent(in) :: n_aer1,d_aer1,sig_aer1
+		real(sp), dimension(n_modes), intent(in) :: n_aer1,d_aer1,sig_aer1, density_core1
+		real(sp), dimension(n_sv), intent(in) :: molw_org1
 		
 		integer(i4b) :: i
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -754,6 +800,8 @@
 		n_aer=n_aer1
 		d_aer=d_aer1
 		sig_aer=sig_aer1
+		molw_org=molw_org1
+		density_core=density_core1
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 		
@@ -767,8 +815,6 @@
 		!molw_org=200e-3_sp                                ! kg per mol
 		r_org=r_gas/molw_org
 		!density_org=1500._sp                            ! kg m-3
-		p_i_0=((10._sp**log_c_star)*298.15_sp*8.2057e-5_sp) &
-				/((molw_org*1.e3_sp)*1.e6_sp)*1.e5_sp           ! sat vap pres at 298.15 k
 		!delta_h_vap=150._sp                             ! enthalpy phase change (kj mol-1)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
@@ -783,13 +829,6 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! how much organic has condensed                                                 !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		mass_org_condensed=org_content ! set to the total, as we assume it is all in the 
-										! vapour phase initially
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! initial mass in ith distribution                                               !

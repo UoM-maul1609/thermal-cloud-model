@@ -22,16 +22,14 @@
         use nrtype1
         use random, only : random_normal
         use sub, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
-        		act_frac2, &
-        		n_aer1, d_aer1, sig_aer1, molw_core, density_core, nu_core, org_content1, &
-        		molw_org, density_org, delta_h_vap, nu_org, log_c_star, p_test, t_test, &
-        		w_test, act_frac,mass_initial, mass_org_condensed, &
-        		a_eq_7, b_eq_7, &
-        		allocate_arrays, ctmm_activation, initialise_arrays, &
-        		solve_semivolatiles
+        	n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, nu_core1, org_content1, &
+        	molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, p_test, t_test, &
+    		w_test, act_frac1, &
+    		a_eq_7, b_eq_7, &
+    		allocate_arrays, ctmm_activation, initialise_arrays
         implicit none
 
-        real(sp) :: w1,t1,p1,act_frac1
+        real(sp) :: w1,t1,p1
         
         character (len=200) :: nmlfile = ' '
         
@@ -52,10 +50,10 @@
         namelist /bulk_aerosol_setup/ n_mode, n_sv, sv_flag, method_flag, giant_flag, &
         			a_eq_7, b_eq_7      
         ! run parameters / input arrays
-        namelist /bulk_aerosol_spec/ n_aer1, d_aer1, sig_aer1, molw_core, density_core, &
-        					nu_core, org_content1, molw_org, density_org, &
-        					delta_h_vap, &
-        					nu_org, log_c_star, p_test, t_test, w_test, &
+        namelist /bulk_aerosol_spec/ n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, &
+        					nu_core1, org_content1, molw_org1, density_org1, &
+        					delta_h_vap1, &
+        					nu_org1, log_c_star1, p_test, t_test, w_test, &
         					rand_dist, n_rand, mean_w,sigma_w
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -72,7 +70,10 @@
         open(8,file=nmlfile,status='old', recl=80, delim='apostrophe')
         read(8,nml=bulk_aerosol_setup)
         ! allocate memory / init
-		call allocate_arrays(n_mode,n_sv)
+		call allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
+			molw_core1,density_core1,nu_core1,org_content1, &
+			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, &
+			act_frac1)
         
         read(8,nml=bulk_aerosol_spec)
         close(8)
@@ -84,7 +85,7 @@
         ! initialise arrays								                       !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
-					n_aer1,d_aer1,sig_aer1)
+					n_aer1,d_aer1,sig_aer1, molw_org1,density_core1)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 
@@ -94,13 +95,13 @@
         if(.not. rand_dist) then
         	print *,'act_frac1, n_act'
 			call ctmm_activation(n_mode,n_sv,sv_flag, &
-								n_aer1, d_aer1,sig_aer1,molw_core, &
-								density_core, nu_core, &
-								org_content1,molw_org, density_org, delta_h_vap, nu_org,  &
-								log_c_star, &
-								w_test, t_test,p_test, &
-								act_frac)
-			print *,act_frac,  sum(act_frac*n_aer1)
+						n_aer1, d_aer1,sig_aer1,molw_core1, &
+						density_core1, nu_core1, &
+						org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
+						log_c_star1, &
+						w_test, t_test,p_test, a_eq_7, b_eq_7, &
+						act_frac1)
+			print *,act_frac1,  sum(act_frac1*n_aer1)
 		else
 			! random number generator
 			call random_seed(size=l)
@@ -125,17 +126,17 @@
 				! initialise arrays								                       !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
-							n_aer1,d_aer1,sig_aer1)
+							n_aer1,d_aer1,sig_aer1, molw_org1,density_core1)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				
 				call ctmm_activation(n_mode,n_sv,sv_flag, &
-									n_aer1, d_aer1,sig_aer1,molw_core, &
-									density_core, nu_core, &
-									org_content1,molw_org, density_org, delta_h_vap, nu_org,  &
-									log_c_star, &
-									w_test, t_test,p_test, &
-									act_frac)
-				print *,w_test,act_frac,  sum(act_frac*n_aer1)
+							n_aer1, d_aer1,sig_aer1,molw_core1, &
+							density_core1, nu_core1, &
+							org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
+							log_c_star1, &
+							w_test, t_test,p_test, a_eq_7, b_eq_7, &
+							act_frac1)
+				print *,w_test,act_frac1,  sum(act_frac1*n_aer1)
 			enddo
 			deallocate(seed)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
