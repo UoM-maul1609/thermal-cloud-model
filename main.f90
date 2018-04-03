@@ -21,7 +21,7 @@
     program main
         use nrtype1
         use random, only : random_normal
-        use sub, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
+        use bam, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
         	n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, nu_core1, org_content1, &
         	molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, p_test, t_test, &
     		w_test, act_frac1, &

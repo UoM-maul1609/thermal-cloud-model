@@ -2,7 +2,7 @@
 	!>Paul Connolly, The University of Manchester
 	!>@brief
 	!>code to allocate arrays, and call activation 
-	module sub
+	module bam
 	use nrtype1
 	implicit none
 		real(sp), parameter :: grav=9.8_sp, lv=2.5e6_sp,cp=1005._sp,molw_air=29.e-3_sp,     &
@@ -850,5 +850,5 @@
 	end subroutine initialise_arrays
 	
 	
-	end module sub	
+	end module bam	
 
