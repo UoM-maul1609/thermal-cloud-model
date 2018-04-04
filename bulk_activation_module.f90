@@ -43,12 +43,21 @@
 		integer(i4b) :: n_mode, n_sv, method_flag, giant_flag, sv_flag 
 		! 1=abdul-razzak, ghan; 2=fountoukis and nenes; 3=fountoukis and nenes with quad
 	
+		! for random number:
+		real(sp) :: r, mean_w, sigma_w
+		real(sp), dimension(10,10) :: rs
+		integer(i4b), allocatable, dimension(:) :: seed
+		integer(i4b) :: l, n_rand
+		logical :: rand_dist=.false.
+
 	private 
 	public :: ctmm_activation, allocate_arrays, initialise_arrays, &
+		read_in_bam_namelist, &
 		n_mode, n_sv, method_flag, giant_flag, sv_flag, &
 		p_test, t_test, w_test, a_eq_7, b_eq_7, n_aer1, d_aer1, sig_aer1, &
 		org_content1, molw_org1, log_c_star1, density_org1, nu_org1, delta_h_vap1, &
-		molw_core1, density_core1, nu_core1, act_frac1
+		molw_core1, density_core1, nu_core1, act_frac1, &
+		r, mean_w, sigma_w, rs, seed, l, n_rand, rand_dist
 				
 	contains
 	!>@author
@@ -849,6 +858,54 @@
 
 	end subroutine initialise_arrays
 	
+	
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>read in the data from the namelists for the BAM module
+	!>@param[in] nmlfile
+	subroutine read_in_bam_namelist(nmlfile)
+		implicit none
+        character (len=200), intent(in) :: nmlfile
+	    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! namelists                                                            !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! set up flags, etc
+        namelist /bulk_aerosol_setup/ n_mode, n_sv, sv_flag, &
+        			method_flag, giant_flag, &
+        			a_eq_7, b_eq_7      
+        ! run parameters / input arrays
+        namelist /bulk_aerosol_spec/ n_aer1, d_aer1, sig_aer1, &
+        					molw_core1, density_core1, &
+        					nu_core1, org_content1, molw_org1, density_org1, &
+        					delta_h_vap1, &
+        					nu_org1, log_c_star1, p_test, t_test, w_test, &
+        					rand_dist, n_rand, mean_w,sigma_w
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! read in namelists	and allocate arrays								   !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        open(8,file=nmlfile,status='old', recl=80, delim='apostrophe')
+        read(8,nml=bulk_aerosol_setup)
+        ! allocate memory / init
+		call allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
+			molw_core1,density_core1,nu_core1,org_content1, &
+			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, &
+			act_frac1)
+        
+        read(8,nml=bulk_aerosol_spec)
+        close(8)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	end subroutine read_in_bam_namelist
+	
+
 	
 	end module bam	
 

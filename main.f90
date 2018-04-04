@@ -26,37 +26,15 @@
         	molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, p_test, t_test, &
     		w_test, act_frac1, &
     		a_eq_7, b_eq_7, &
-    		allocate_arrays, ctmm_activation, initialise_arrays
+    		r, mean_w, sigma_w, rs, seed, l, n_rand, rand_dist, &
+    		allocate_arrays, ctmm_activation, initialise_arrays, &
+    		read_in_bam_namelist
         implicit none
 
-        real(sp) :: w1,t1,p1
-        
         character (len=200) :: nmlfile = ' '
         
 		! for random number:
-		real(sp) :: r, mean_w, sigma_w
-		real(sp), dimension(10,10) :: rs
-		integer(i4b), allocatable, dimension(:) :: seed
-		integer(i4b) :: l, i, n_rand
-		logical :: rand_dist=.false.
-
-
-
-
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! namelists                                                            !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! set up flags, etc
-        namelist /bulk_aerosol_setup/ n_mode, n_sv, sv_flag, method_flag, giant_flag, &
-        			a_eq_7, b_eq_7      
-        ! run parameters / input arrays
-        namelist /bulk_aerosol_spec/ n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, &
-        					nu_core1, org_content1, molw_org1, density_org1, &
-        					delta_h_vap1, &
-        					nu_org1, log_c_star1, p_test, t_test, w_test, &
-        					rand_dist, n_rand, mean_w,sigma_w
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+		integer(i4b) :: i
 
 
 
@@ -67,16 +45,7 @@
         ! read in namelists	and allocate arrays								   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         call getarg(1,nmlfile)
-        open(8,file=nmlfile,status='old', recl=80, delim='apostrophe')
-        read(8,nml=bulk_aerosol_setup)
-        ! allocate memory / init
-		call allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
-			molw_core1,density_core1,nu_core1,org_content1, &
-			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, &
-			act_frac1)
-        
-        read(8,nml=bulk_aerosol_spec)
-        close(8)
+        call read_in_bam_namelist(nmlfile)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
