@@ -26,6 +26,8 @@
         use variables
         use initialisation
         use drivers
+        use bam, only : read_in_bam_namelist
+        
         implicit none
 
         character (len=200) :: nmlfile = ' '
@@ -41,7 +43,9 @@
         namelist /run_vars/ outputfile, runtime, ip, kp, dx, dz, dt, &
                     nq, nprec, &
         			advection_scheme, ord, halo, &
-        			monotone, microphysics_flag,hm_flag, theta_flag, ice_init, &
+        			monotone, microphysics_flag, &
+        			bam_nmlfile, hm_flag, theta_flag, &
+        			drop_num_init, num_drop, ice_init, &
         			num_ice, mass_ice
         namelist /run_vars2/ q_type, q_init
         			
@@ -65,6 +69,10 @@
         read(8,nml=thermal_vars)
         close(8)
         o_halo=ord+2 !ord+1
+
+        if (microphysics_flag .eq. 2) then
+            call read_in_bam_namelist(bam_nmlfile)
+        endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -79,7 +87,8 @@
                             q_read,ip,kp,o_halo,dx,dz,grid1%q, grid1%precip, &
                             grid1%theta, grid1%p,grid1%x,grid1%xn, &
                             grid1%z,grid1%zn,grid1%t,grid1%rho,grid1%u,grid1%w, &
-                            ice_init, num_ice, mass_ice)
+                            drop_num_init, num_drop, ice_init, num_ice, mass_ice, &
+                            microphysics_flag)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

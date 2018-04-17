@@ -57,6 +57,7 @@
     use io_module
     use advection_2d
     use micro_module
+    use w_micro_module
 
     implicit none
     integer(i4b), intent(in) :: nq,nprec,ip,kp, ord, o_halo, advection_scheme
@@ -152,7 +153,14 @@
         if (microphysics_flag .eq. 1) then
 			call microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
-						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice)			
+						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice)		
+						   
+						   
+		else if (microphysics_flag .eq. 2) then
+			call w_microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
+							theta(:,:),p(:,:), &
+						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice)		
+						   
 		endif       
 
 

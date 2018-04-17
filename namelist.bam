@@ -7,28 +7,28 @@
 	dx=50.,
 	dz=50.,
 	dt=10.,
- 	nq = 9, ! number of q variables
-    nprec=4, ! number of precipitation types
+ 	nq = 5, ! number of q variables
+    nprec=1, ! number of precipitation types
 	advection_scheme=1, ! 0=upstream, 1=mpdata, 2=bott - these options aren't all coded
 	ord=8,		     ! order of advection for bott scheme (except precip)
 	halo=0,
 	monotone=.true.,    ! monotone advection (except precip)
-	microphysics_flag=1, ! flag for microphysics: 0 (no micro); 1 (bulk scheme #1)
+	microphysics_flag=2, ! flag for microphysics: 0 (no micro); 1 (bulk scheme #1)
 	                     ! 2 (bulk scheme #2)
 	bam_nmlfile='wmm/bam/namelist.in', ! filename of bam namelist
 	hm_flag=.true.,	     ! switch hm process on / off
 	theta_flag=.false.,  ! advect theta
 	drop_num_init=.true., ! only works for microphysics_flag=2
-	num_drop=100.e6, ! initial drop number concentration
+	num_drop=1000.e6, ! initial drop number concentration
 	ice_init=.true.,     ! flag to initialise ice only works for microphysics_flag=1
 	num_ice=1000.,      ! number conc of primary ice crystals /kg
 	mass_ice=1.e-14/    ! mass of new ice crystal  
  &run_vars2
-    q_type = 0,1,1,1,1,1,2,2,2, ! the type of q-variable. 0 vapour, 1 mass, 2 number conc.
-    q_init =.true.,.false.,.false.,.false.,.false.,.false.,.false.,.false.,.false./ ! whether to initialise or now
+    q_type = 0,1,1,2,2, ! the type of q-variable. 0 vapour, 1 mass, 2 number conc.
+    q_init =.true.,.false.,.false.,.false.,.false./ ! whether to initialise or noT
  &sounding_spec ! environmental sounding parameters
  	adiabatic_prof=.true.,
- 	adiabatic_frac=1.0,
+ 	adiabatic_frac=0.2,
  	psurf=100000.,
  	tsurf=300.,
  	t_cbase=290.,

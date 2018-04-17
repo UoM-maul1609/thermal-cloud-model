@@ -1,7 +1,10 @@
 MPM_DIR = mpm
+WMM_DIR = wmm
+BAM_DIR = wmm/bam
 
 .PHONY: mpm_code cleanall
-CLEANDIRS = $(MPM_DIR) ./
+.PHONY: wmm_code cleanall
+CLEANDIRS = $(MPM_DIR) $(WMM_DIR) $(WMM_DIR)/bam ./
 
 DEBUG = -fbounds-check -g
 MPI    =#-DMPI1
@@ -26,15 +29,16 @@ AR = ar
 RANLIB = ranlib 
 OBJ = o
 FFLAGS = $(OPT)  $(DEBUG)  -o 
-FFLAGS2 =  $(DEBUG) -O0 -o 
+FFLAGS2 =  $(DEBUG) -O3 -o 
 
 
 main.exe	:  model_lib.a  main.$(OBJ) variables.$(OBJ) initialisation.$(OBJ) \
 			 driver_code.$(OBJ) thermal_code.$(OBJ) io_code.$(OBJ) advection_2d.$(OBJ) \
-			 advection_1d.$(OBJ) mpm_code
+			 advection_1d.$(OBJ) mpm_code wmm_code
 	$(FOR2) $(FFLAGS2)main.exe main.$(OBJ) variables.$(OBJ) initialisation.$(OBJ) \
 	     driver_code.$(OBJ) thermal_code.$(OBJ) io_code.$(OBJ) advection_2d.$(OBJ) \
-	     		 $(MPM_DIR)/advection_1d.$(OBJ) $(MPM_DIR)/microphysics.$(OBJ) -lm model_lib.a \
+	     		 $(MPM_DIR)/micro_lib.a $(WMM_DIR)/wmicro_lib.a $(BAM_DIR)/bam_lib.a \
+	     		 -lm model_lib.a \
 		${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
@@ -62,11 +66,11 @@ zbrent.$(OBJ)	: zbrent.f90
 	$(FOR) zbrent.f90 $(FFLAGS2)zbrent.$(OBJ)	
 variables.$(OBJ) : variables.f90 
 	$(FOR) variables.f90 $(FFLAGS)variables.$(OBJ)
-initialisation.$(OBJ) : initialisation.f90
-	$(FOR) initialisation.f90 $(FFLAGS)initialisation.$(OBJ)
+initialisation.$(OBJ) : initialisation.f90 mpm_code
+	$(FOR) initialisation.f90 $(FFLAGS)initialisation.$(OBJ) -I$(MPM_DIR)
 driver_code.$(OBJ) : driver_code.f90 thermal_code.$(OBJ) io_code.$(OBJ) \
-		advection_2d.$(OBJ) advection_1d.$(OBJ) mpm_code
-	$(FOR) driver_code.f90 $(FFLAGS)driver_code.$(OBJ) -I$(MPM_DIR)
+		advection_2d.$(OBJ) advection_1d.$(OBJ) mpm_code wmm_code
+	$(FOR) driver_code.f90 $(FFLAGS)driver_code.$(OBJ) -I$(MPM_DIR) -I$(WMM_DIR)
 thermal_code.$(OBJ) : thermal_code.f90 
 	$(FOR) thermal_code.f90 $(FFLAGS)thermal_code.$(OBJ)
 io_code.$(OBJ) : io_code.f90 
@@ -79,12 +83,15 @@ hygfx.$(OBJ) : hygfx.for
 	$(FOR) hygfx.for $(FFLAGS)hygfx.$(OBJ) 
 main.$(OBJ)   : main.f90 variables.$(OBJ) initialisation.$(OBJ) driver_code.$(OBJ) \
 			 thermal_code.$(OBJ) io_code.$(OBJ) advection_2d.$(OBJ) advection_1d.$(OBJ) \
-			 mpm_code
-	$(FOR)  main.f90 -I ${NETCDFMOD}  $(FFLAGS)main.$(OBJ) 
+			 mpm_code wmm_code
+	$(FOR)  main.f90 -I ${NETCDFMOD} -I${BAM_DIR} $(FFLAGS)main.$(OBJ) 
 	
 
 mpm_code:
 	$(MAKE) -C $(MPM_DIR)
+
+wmm_code:
+	$(MAKE) -C $(WMM_DIR)
 
 clean: 
 	rm *.exe  *.o *.mod *~ \

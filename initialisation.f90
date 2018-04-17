@@ -1,7 +1,7 @@
 	!>@author
 	!>Paul Connolly, The University of Manchester
 	!>@brief
-	!>initialisation for the simple cloud model and solves the 
+	!>initialisation for the thermal cloud model and solves the 
 	!>hydrostatic equation for pressure:
 	!>\f$ \frac{\partial P}{\partial z} = - \frac{P}{R_aT}g \f$
     module initialisation
@@ -68,14 +68,19 @@
 	!>@param[in] dx horizontal resolution of grid
 	!>@param[in] dz vertical resolution of grid
 	!>@param[inout] q, precip, theta, pressure, x,xn,z,zn, temperature, rho,u,w
+	!>@param[in] drop_num_init: flag to initialise number of drops where liquid water>0
+	!>@param[in] number conc of drops #/kg
 	!>@param[in] ice_init: flag to initialise ice crystals in model
 	!>@param[in] number conc of ice crystals #/kg
 	!>@param[in] mass of a single ice crystal kg.
+	!>@param[in] microphysics_flag: flag for kind of microphysics used
     subroutine calc_profile_2d(nq,nprec,n_levels,psurf,tsurf,t_cbase, &
     						t_ctop, adiabatic_prof, adiabatic_frac,q_type,q_init, &
                              z_read,theta_read,q_read, &
                              ip,kp,o_halo,dx,dz,q,precip,theta,p,x,xn,z,zn,t,rho,u,w, &
-                             ice_init, num_ice, mass_ice)
+                             drop_num_init, num_drop, &
+                             ice_init, num_ice, mass_ice, &
+                             microphysics_flag)
     use nrtype
     use nr, only : locate, polint, rkqs, odeint, zbrent
     use constants
@@ -89,11 +94,11 @@
     real(sp), dimension(nq,n_levels), intent(in) :: q_read
     integer(i4b), dimension(nq), intent(in) :: q_type
     logical, dimension(nq), intent(in) :: q_init
-    integer(i4b), intent(in) :: ip, kp
+    integer(i4b), intent(in) :: ip, kp, microphysics_flag
     real(sp), intent(in) :: dx, dz, psurf, tsurf, t_cbase, t_ctop
-    logical, intent(in) :: adiabatic_prof, ice_init
+    logical, intent(in) :: adiabatic_prof, ice_init, drop_num_init
     real(sp), intent(in) :: adiabatic_frac
-    real(sp), intent(in) :: num_ice, mass_ice
+    real(sp), intent(in) :: num_drop, num_ice, mass_ice
     ! inouts
     real(sp), dimension(:,:), allocatable, intent(inout) :: theta, p, t, rho,u, w
     real(sp), dimension(:), allocatable, intent(inout) :: x, z,xn,zn
@@ -231,6 +236,9 @@
 								(p(i,1)-svp_liq(t(i,1)))
 			q(2,i,:)=adiabatic_frac* &
 					max(eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase)) - q(1,i,1),0._sp)
+			if(drop_num_init .and. (microphysics_flag .eq. 2)) then
+			    q(4,i,:) = num_drop
+			endif
 		enddo
 
 		! integrate going upwards - dry adiabatic layer
@@ -248,7 +256,7 @@
 		t(istore2:kp+o_halo,:)=theta1*(p(istore2:kp+o_halo,:)/1.e5_sp)**(ra/cp)
 
 		! initialise ice crystals
-		if(ice_init) then
+		if(ice_init .and. (microphysics_flag .eq. 1)) then
             where(t(istore:istore2,:).lt.ttr)
                 q(6,istore:istore2,:)=num_ice*mass_ice
                 q(7,istore:istore2,:)=num_ice
@@ -382,7 +390,6 @@
 	use nrtype
 	use constants
 	use variables, only : theta_q_sat, p111
-	!use micro_module, only : svp_liq
 	implicit none
 	real(sp), intent(in) :: t111
 	real(sp) :: calc_theta_q
@@ -396,7 +403,6 @@
 	use nrtype
 	use constants
 	use variables, only : theta_q_sat, t1old
-	!use micro_module, only : svp_liq
 	implicit none
 	real(sp), intent(in) :: p
 	real(sp) :: calc_theta_q2
