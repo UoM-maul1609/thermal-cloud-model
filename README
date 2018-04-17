@@ -1,8 +1,8 @@
 Brief:
-	*Warm Micro-Physics Module (WMM).
+	*Warm Micro-Physics Module (WPM).
 	 A 2-moment warm bulk cloud microphysics module for use with various models.
 Compilation:
-	*Type "make" to compile the wmicro_lib.a library
+	*Type "make" to compile the micro_lib.a library
 Doxygen pages:
 	*self generating documentation (from the source code) can be created by typing
 	 "doxygen fortran.dxg" at the command line.

@@ -32,14 +32,18 @@
     						
     						
     ! mass-diameter and size spectra relations
-    real(sp), parameter :: cr=523.6_sp, cs=52.36_sp, cg=261.8_sp, ci=104._sp, &
-    					dr=3_sp, ds=3._sp, dg=3._sp, di=3._sp, &
-    					alpha_r=2.5_sp, alpha_s=2.5_sp, alpha_g=2.5_sp, alpha_i=0._sp
+    real(sp), parameter :: cr=523.6_sp, cc=523.6_sp, &
+                        cs=52.36_sp, cg=261.8_sp, ci=104._sp, &
+    					dr=3_sp, dc=3_sp, ds=3._sp, dg=3._sp, di=3._sp, &
+    					alpha_r=2.5_sp, alpha_c=0.0_sp, & ! note, alpha_c is for a "mass" - number distribution
+    					alpha_s=2.5_sp, alpha_g=2.5_sp, alpha_i=0._sp
     					
 	! terminal fall-speed relations
-	real(sp), parameter :: a_r=362._sp, a_s=4.84_sp, a_g=253._sp, a_i=71.34_sp, &
-							b_r=0.65_sp, b_s=0.25_sp, b_g=0.734_sp, b_i=0.6635_sp, &
-							f_r=0._sp, f_s=0._sp, f_g=0._sp, f_i=0._sp
+	real(sp), parameter :: a_r=362._sp, a_c=362._sp, &
+	                        a_s=4.84_sp, a_g=253._sp, a_i=71.34_sp, &
+							b_r=0.65_sp, b_c=0.65_sp, &
+							b_s=0.25_sp, b_g=0.734_sp, b_i=0.6635_sp, &
+							f_r=0._sp, f_c=0._sp, f_s=0._sp, f_g=0._sp, f_i=0._sp
 							
 	! autoconversion
 	real(sp), parameter :: aw0=1e-3_sp, dwa=20e-6_sp, nl=2.4e8_sp, &
@@ -58,9 +62,9 @@
 						egw=1._sp, eiw=1._sp, egs_wet=1._sp, egi_wet=1._sp
 	
 	! variables used in various process rates:
-	real(sp) :: gam1r,gam2r,gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
-				fall_q_r, fall_q_s, fall_q_g, fall_n_r, fall_n_s, fall_n_g, &
-				fall_q_i, fall_n_i,  &
+	real(sp) :: gam1r,gam2r,gam1c, gam2c, gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
+				fall_q_r, fall_q_c, fall_q_s, fall_q_g, fall_n_r, fall_n_s, fall_n_g, &
+				fall_q_i, fall_n_i, fall_n_c, &
 				phi_r, mass_iacr,num_iacr, mass_sacw_i, mass_iacw, &
 				mass_racs1,mass_racs2,mass_racs3, &
 				mass_racg1,mass_racg2,mass_racg3, &
@@ -73,8 +77,11 @@
 				mass_gacw, mass_gaci, &
 				nu_r1,nu_r2,nu_i1, nu_i2, nu_s1, nu_s2, nu_g1, nu_g2, &
 				mass_imm, num_imm, q0sat, &
-				chi_rain, chi_ice, chi_snow, chi_graupel, &
-				chi_rain1, chi_ice1, chi_snow1, chi_graupel1
+				chi_rain, chi_cloud, chi_ice, chi_snow, chi_graupel, &
+				chi_rain1, chi_cloud1, chi_ice1, chi_snow1, chi_graupel1
+				
+	! Seifert and Beheng autoconversion
+	real(sp) :: kc, kr, xstar
 				
 	real(sp), dimension(3) :: c=[1._sp,2._sp,1._sp]
 	integer(i4b) :: k
@@ -94,6 +101,9 @@
 	! used to calculate intercept and slopes
 	gam1r=gamma(1._sp+alpha_r)
 	gam2r=gamma(1._sp+alpha_r+dr)
+	gam1c=gamma(1._sp+alpha_c)
+	gam2c=gamma(1._sp+alpha_c+1._sp) ! note the 1, instead of dc - drop distribution
+	                                ! is a mass distribution
 	gam1i=gamma(1._sp+alpha_i)
 	gam2i=gamma(1._sp+alpha_i+di)
 	gam1s=gamma(1._sp+alpha_s)
@@ -101,14 +111,16 @@
 	gam1g=gamma(1._sp+alpha_g)
 	gam2g=gamma(1._sp+alpha_g+dg)
 
-    ! mass weighted fall for r, s, g, i
+    ! mass weighted fall for r, c, s, g, i
     fall_q_r=a_r*gamma(1._sp+alpha_r+dr+b_r) / gamma(1._sp+alpha_r+dr)
+    fall_q_c=a_c*gamma(1._sp+alpha_c+1._sp+b_c) / gamma(1._sp+alpha_c+1._sp)
     fall_q_s=a_s*gamma(1._sp+alpha_s+ds+b_s) / gamma(1._sp+alpha_s+ds)
     fall_q_g=a_g*gamma(1._sp+alpha_g+dg+b_g) / gamma(1._sp+alpha_g+dg)
     fall_q_i=a_i*gamma(1._sp+alpha_i+di+b_i) / gamma(1._sp+alpha_i+di)
 
-    ! number weighted fall for r, s, g
+    ! number weighted fall for r, c, s, g
     fall_n_r=a_r*gamma(1._sp+alpha_r+b_r) / gamma(1._sp+alpha_r)
+    fall_n_c=a_c*gamma(1._sp+alpha_c+b_c) / gamma(1._sp+alpha_c)
     fall_n_s=a_s*gamma(1._sp+alpha_s+b_s) / gamma(1._sp+alpha_s)
     fall_n_g=a_g*gamma(1._sp+alpha_g+b_g) / gamma(1._sp+alpha_g)
     fall_n_i=a_i*gamma(1._sp+alpha_i+b_i) / gamma(1._sp+alpha_i)
@@ -213,15 +225,22 @@
 	
 	! precipitation
 	chi_rain=gamma(1._sp+alpha_r+b_r+dr)
+	chi_cloud=gamma(1._sp+alpha_c+b_c+1._sp)
 	chi_ice=gamma(1._sp+alpha_i+b_i+di)
 	chi_snow=gamma(1._sp+alpha_s+b_s+ds)
 	chi_graupel=gamma(1._sp+alpha_g+b_g+dg)
 	
 	chi_rain1=gamma(1._sp+alpha_r+dr)
+	chi_cloud1=gamma(1._sp+alpha_c+1._sp)
 	chi_ice1=gamma(1._sp+alpha_i+di)
 	chi_snow1=gamma(1._sp+alpha_s+ds)
 	chi_graupel1=gamma(1._sp+alpha_g+dg)
 	
+
+    ! Seifert and Beheng autoconversion:
+    kc=9.44e9_sp ! m3 kg-2 s-1
+    kr=5.78e0_sp ! m3 kg-2 s-1
+    xstar=2.6e-10_sp ! kg
     end subroutine initialise_microphysics_vars
     
 	!>@author
@@ -252,7 +271,7 @@
     integer(i4b), intent(in) :: nq, ip,kp, o_halo
     real(sp), intent(in) :: dt,dz
     real(sp), dimension(nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: q
-    real(sp), dimension(4,1:kp,1:ip), intent(inout) :: precip
+    real(sp), dimension(1,1:kp,1:ip), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
     					theta, p, t, rho
     real(sp), dimension(-o_halo+1:kp+o_halo) :: z
@@ -302,7 +321,7 @@
     integer(i4b), intent(in) :: nq, kp, o_halo
     real(sp), intent(in) :: dt,dz
     real(sp), dimension(nq,-o_halo+1:kp+o_halo), intent(inout) :: q
-    real(sp), dimension(4,1:kp), intent(inout) :: precip
+    real(sp), dimension(1,1:kp), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: theta, p, z, t, rho
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag
@@ -311,7 +330,8 @@
     ! locals:
     integer(i4b) :: k,iter, n_step
     real(sp) :: temp, qtot,qaut, a, b, ab_ice, ab_liq, ice_dep,snow_dep,graup_dep, &
-    			nu_ice, nu_snow, nu_graup, diff1, ktherm1, tc, nu_vis, sc, nu_rain, rain_evap
+    			nu_ice, nu_snow, nu_graup, diff1, ktherm1, tc, nu_vis, sc, nu_rain, rain_evap, &
+    			sb_aut, sb_acr, sb_cwaut, sb_cwacr, sb_raut, sb_rsel, sb_cwsel
     real(sp), dimension(kp) :: smr, smr_i
     
     real(sp), dimension(kp) :: &
@@ -350,16 +370,23 @@
 				rsbrk, & ! break-up of large snowflakes
 				psdep, & ! deposition of vapour onto snow
 				psmlt, & ! melting of snow to form rain
-				pssub    ! sublimation of snow
+				pssub, & ! sublimation of snow
+				rcwaut, & ! reduction in cloud number due to autoconversion
+				rcwacr, & ! cloud water number accreted onto rain
+				rraut, &  ! increase in rain number due to autoconversion
+    			rrsel, &     ! rain self accretion - number
+    			rcwsel     ! cloud water self accretion - number
     				    
     real(sp) :: pgwet ! amount of liquid that graupel can freeze without shedding
     								
 
-    real(sp), dimension(kp) :: n_r, lam_r, n_i, lam_i, n_s, lam_s, n_g, lam_g
+    real(sp), dimension(kp) :: n_r, lam_r, n_i, lam_i, n_s, lam_s, n_g, lam_g, lam_c, n_c
     real(sp), dimension(kp) :: rho_fac
-	real(sp), dimension(-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vnr, vns, vng, vni
+	real(sp), dimension(-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vnr, vns, vng, vni, &
+	                                        vqc, vnc
 	! coalescence efficiencies
 	real(sp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
+	real(sp) :: qold
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
@@ -416,7 +443,11 @@
 	psdep=0._sp
 	psmlt=0._sp
 	pssub=0._sp
-
+	rcwaut=0._sp
+    rcwacr=0._sp
+    rraut=0._sp
+    rrsel=0._sp
+    rcwsel=0._sp
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     
@@ -427,51 +458,32 @@
     rho=p / (ra*t) ! air density    
     rho_fac=(rho0/rho(1:kp))**0.5_sp
     ! rain n0, lambda
-    lam_r=(nar*cr*gam2r / (rho(1:kp)*max(q(3,1:kp),1.e-10_sp)))**(1._sp/(1._sp+alpha_r+dr-nbr))
-    n_r=nar*lam_r**nbr
-    ! ice n0, lambda
-    lam_i=(max(q(7,1:kp),1._sp)*ci*gam2i / (max(q(6,1:kp),1.e-10_sp)*gam1i))**(1._sp/di)
-    n_i=rho(1:kp)*max(q(7,1:kp),0._sp)*lam_i**(1._sp+alpha_i) / gam1i
-    ! snow n0, lambda
-    lam_s=(max(q(8,1:kp),1._sp)*cs*gam2s / (q(4,1:kp)*gam1s))**(1._sp/ds)
-    n_s=rho(1:kp)*max(q(8,1:kp),0._sp)*lam_s**(1._sp+alpha_s) / gam1s
-    ! graupel n0, lambda
-    lam_g=(max(q(9,1:kp),1._sp)*cg*gam2g / (max(q(5,1:kp),1.e-10)*gam1g))**(1._sp/dg)
-    n_g=rho(1:kp)*max(q(9,1:kp),0._sp)*lam_g**(1._sp+alpha_g) / gam1g
-    
+    lam_r=(max(q(5,1:kp),1._sp)*cr*gam2r / (max(q(3,1:kp),1.e-10_sp)*gam1r))**(1._sp/dr)
+    n_r=rho(1:kp)*max(q(5,1:kp),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
+    ! cloud n0, lambda    
+    lam_c=(max(q(4,1:kp),1._sp)*cc*gam2c / (max(q(2,1:kp),1.e-10_sp)*gam1c))**(1._sp/1._sp)
+    n_c=rho(1:kp)*max(q(4,1:kp),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
+
     
     ! precipitation
 	precip(1,1:kp)=cr*n_r*(a_r*chi_rain/(lam_r**(alpha_r+b_r+dr+1._sp)) - &
 					u(1:kp)*chi_rain1/(lam_r**(alpha_r+dr+1._sp))) &
 					/rho(1:kp) *3600._sp
-	precip(2,1:kp)=cs*n_s*(a_s*chi_snow/(lam_s**(alpha_s+b_s+ds+1._sp)) - &
-					u(1:kp)*chi_snow1/(lam_s**(alpha_s+ds+1._sp))) &
-					/rho(1:kp)*3600._sp
-	precip(3,1:kp)=cg*n_g*(a_g*chi_graupel/(lam_g**(alpha_g+b_g+dg+1._sp)) - &
-					u(1:kp)*chi_graupel1/(lam_g**(alpha_g+dg+1._sp))) &
-					/rho(1:kp)*3600._sp
-	precip(4,1:kp)=ci*n_i*(a_i*chi_ice/(lam_i**(alpha_i+b_i+di+1._sp)) - &
-					u(1:kp)*chi_ice1/(lam_i**(alpha_i+di+1._sp))) &
-					/rho(1:kp)*3600._sp
     
     ! fall speeds
+    ! rain
     vqr(1:kp)=max(fall_q_r*rho_fac * lam_r**(1._sp+alpha_r+dr) / &
     	(lam_r+f_r)**(1._sp+alpha_r+dr+b_r), 0._sp)
-    vqs(1:kp)=max(fall_q_s*rho_fac * lam_s**(1._sp+alpha_s+ds) / &
-    	(lam_s+f_s)**(1._sp+alpha_s+ds+b_s), 0._sp)
-    vqg(1:kp)=max(fall_q_g*rho_fac * lam_g**(1._sp+alpha_g+dg) / &
-    	(lam_g+f_g)**(1._sp+alpha_g+dg+b_g), 0._sp)
-    vqi(1:kp)=max(fall_q_i*rho_fac * lam_i**(1._sp+alpha_i+di) / &
-    	(lam_i+f_i)**(1._sp+alpha_i+di+b_i), 0._sp)
     
     vnr(1:kp)=max(fall_n_r*rho_fac * lam_r**(1._sp+alpha_r) / &
     	(lam_r+f_r)**(1._sp+alpha_r+b_r), 0._sp)
-    vns(1:kp)=max(fall_n_s*rho_fac * lam_s**(1._sp+alpha_s) / &
-    	(lam_s+f_s)**(1._sp+alpha_s+b_s), 0._sp)
-    vng(1:kp)=max(fall_n_g*rho_fac * lam_g**(1._sp+alpha_g) / &
-    	(lam_g+f_g)**(1._sp+alpha_g+b_g), 0._sp)
-    vni(1:kp)=max(fall_n_i*rho_fac * lam_i**(1._sp+alpha_i) / &
-    	(lam_i+f_i)**(1._sp+alpha_i+b_i), 0._sp)
+    
+    ! cloud
+    vqc(1:kp)=max(fall_q_c*rho_fac * lam_c**(1._sp+alpha_c+1._sp) / &
+    	(lam_c+f_c)**(1._sp+alpha_c+1._sp+b_c), 0._sp)
+    
+    vnc(1:kp)=max(fall_n_c*rho_fac * lam_c**(1._sp+alpha_c) / &
+    	(lam_c+f_c)**(1._sp+alpha_c+b_c), 0._sp)
     	
     ! coalescence efficiencies
     egi_dry=0.2_sp*exp(0.08*(t(1:kp)-ttr))
@@ -482,13 +494,15 @@
     
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-    
      
     
    
     
     ! loop over all levels
     do k=1,kp
+        
+        
+
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! condensation of liquid water                                                   !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -501,7 +515,7 @@
     	smr_i(k)=eps1*svp_ice(t(k))/(p(k)-svp_ice(t(k))) ! saturation mixing ratio - ice	
     	
     	qtot=q(1,k)+q(2,k)
-    	
+    	qold=q(3,k)
     	if(smr(k).lt.qtot) then
     		q(2,k)=qtot-smr(k)
     		q(1,k)=smr(k)
@@ -512,7 +526,36 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-	
+
+
+
+	    if((q(2,k) .gt. 0._sp) .and. (q(4,k) .lt. 1._sp)) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Bulk Aerosol Activation - number of drops
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            p_test=p(k)
+            t_test=t(k)
+            w_test=max(u(k),0.001_sp)
+            call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
+                        n_aer1,d_aer1,sig_aer1, molw_org1,density_core1)
+        
+            call ctmm_activation(n_mode,n_sv,sv_flag, &
+                        n_aer1, d_aer1,sig_aer1,molw_core1, &
+                        density_core1, nu_core1, &
+                        org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
+                        log_c_star1, &
+                        w_test, t_test,p_test, a_eq_7, b_eq_7, &
+                        act_frac1)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            q(4,k)=sum(n_aer1*act_frac1)
+        endif        
+        
+
+
+
+
+
+
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! evaporation of rain                                                            !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -538,343 +581,54 @@
 		
 
 
-	
-		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! deposition & sublimation onto ice, snow, graupel                               !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-		nu_snow=2._sp*pi*n_s(k) / rho(k) * &
-				(nu_s1 / lam_s(k)**(2._sp+alpha_s) + &
-				(a_s/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
-				(rho(k)*rho0)**0.25_sp*nu_s2 / &
-				(lam_s(k)+0.5_sp*f_s)**(0.5_sp*b_s+alpha_s+2.5_sp))
-
-		nu_graup=2._sp*pi*n_g(k) / rho(k) * &
-				(nu_g1 / lam_g(k)**(2._sp+alpha_g) + &
-				(a_g/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
-				(rho(k)*rho0)**0.25_sp*nu_g2 / &
-				(lam_g(k)+0.5_sp*f_g)**(0.5_sp*b_g+alpha_g+2.5_sp))
-	
-		if (t(k).le.ttr) then
-			nu_ice=2._sp*pi*n_i(k) / rho(k) * &
-					(nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
-					(a_i/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
-					(rho(k)*rho0)**0.25_sp*nu_i2 / &
-					(lam_i(k)+0.5_sp*f_i)**(0.5_sp*b_i+alpha_i+2.5_sp))
-
-			ab_ice=ls**2 / (ktherm1*rv*t(k)**2) + 1._sp/(rho(k)*smr_i(k)*diff1)
-		
-			ice_dep=(q(1,k)/smr_i(k)-1._sp) / (rho(k)*ab_ice)*nu_ice
-			snow_dep=(q(1,k)/smr_i(k)-1._sp) / (rho(k)*ab_ice)*nu_snow
-			graup_dep=(q(1,k)/smr_i(k)-1._sp) / (rho(k)*ab_ice)*nu_graup
-			if(q(1,k).gt.smr_i(k)) then
-				pisub(k)=0._sp
-				pssub(k)=0._sp
-				pgsub(k)=0._sp
-				pidep(k)=max(ice_dep,0._sp)
-				psdep(k)=max(snow_dep,0._sp)
-				pgdep(k)=max(graup_dep,0._sp)
-			else
-				pidep(k)=0._sp
-				psdep(k)=0._sp
-				pgdep(k)=0._sp			
-				pisub(k)=-min(ice_dep,0._sp)
-				pssub(k)=-min(snow_dep,0._sp)
-				pgsub(k)=-min(graup_dep,0._sp)
-			endif
-		endif
+		! warm rain autoconversion based on Seifert and Beheng (2006)                    !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! warm rain autoconversion                                                       !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		praut(k)=aw0*max(q(2,k)-lw0/rho(k), 0._sp) ! kessler scheme
+		call seifert_beheng(sb_aut,sb_acr, sb_cwaut, sb_cwacr, sb_raut, &
+		                    sb_rsel, sb_cwsel, q(2,k),q(4,k),q(3,k),q(5,k),rho(k),dt)
+		praut(k)=sb_aut
+		pracw(k)=sb_acr
+		rcwaut(k)=sb_cwaut
+		rcwacr(k)=sb_cwacr
+		rraut(k)=sb_raut
+		rrsel(k)=sb_rsel
+		rcwsel(k)=sb_cwsel
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! collection of cloud by rain, cloud by snow and cloud by ice                    !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		pracw(k)=max(phi_r* n_r(k)* erw *q(2,k)*rho_fac(k) / &
-				(lam_r(k)+f_r)**(3._sp+b_r+alpha_r),0._sp)
-		! snow-cloud water
-		psacw(k)=max(mass_sacw_i * n_s(k)* esw *q(2,k)*rho_fac(k) / &
-				(lam_s(k)+f_s)**(3._sp+b_s+alpha_s),0._sp)
-		psaci(k)=max(mass_sacw_i * n_s(k)* esi(k) *q(6,k)*rho_fac(k) / &
-				(lam_s(k)+f_s)**(3._sp+b_s+alpha_s),0._sp)
-		if (t(k).le.ttr) then
-			piacw(k)=max(mass_iacw * n_i(k)* eiw *q(2,k)*rho_fac(k) / &
-					(lam_i(k)+f_i)**(3._sp+b_i+alpha_i),0._sp)
-		endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! collection of rain by ice to make snow or graupel                              !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if (t(k).le.ttr) then
-			if(q(3,k).lt.1e-4_sp) then
-				praci_g(k)=0._sp
-				praci_s(k)=max(phi_r* n_r(k)* eri *q(6,k)*rho_fac(k) / &
-						(lam_r(k)+f_r)**(3_sp+b_r+alpha_r),0._sp)
-				piacr_g(k)=0._sp
-				piacr_s(k)=max(mass_iacr*n_r(k)*q(7,k)*rho_fac(k) / &
-						(lam_r(k)+f_r)**(3_sp+b_r+dr+alpha_r),0._sp)
-				riacr_g(k)=0._sp
-				riacr_s(k)=max(num_iacr*n_r(k)*q(7,k)*rho_fac(k) / &
-						(lam_r(k)+f_r)**(3_sp+b_r+alpha_r),0._sp)
-			else
-				praci_s(k)=0._sp
-				praci_g(k)=max(phi_r* n_r(k)* eri *q(6,k)*rho_fac(k) / &
-						(lam_r(k)+f_r)**(3_sp+b_r+alpha_r),0._sp)
-				piacr_s(k)=0._sp
-				piacr_g(k)=max(mass_iacr*n_r(k)*q(7,k)*rho_fac(k) / &
-						(lam_r(k)+f_r)**(3_sp+b_r+dr+alpha_r),0._sp)
-				riacr_s(k)=0._sp
-				riacr_g(k)=max(num_iacr*n_r(k)*q(7,k)*rho_fac(k) / &
-						(lam_r(k)+f_r)**(3_sp+b_r+alpha_r),0._sp)
-		
-			endif
-		endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! snow autoconversion                                                            !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if (q(6,k).gt.1e-10_sp.and.(q(7,k).gt.1e-5_sp)) then
-			psaut(k)=max(q(6,k)* &
-				(min(lambda_imin /lam_i(k),2._sp)**di - 1._sp) / tsaut,0._sp)
-			rsaut(k)=max(psaut(k)/(ci*di2s**di),0._sp)
-		endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! graupel autoconversion                                                         !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if (rho(k)*q(4,k).gt.3e-4_sp.and.(t(k).lt.269.15_sp)) then
-			pgaut(k)=max(0.5_sp*max(0._sp,psacw(k)-psdep(k)-psaci(k)), 0._sp)
-		endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! snow and ice aggregation                                                       !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- 		rsacs(k)=max(isnow*n_s(k)**2._sp*ess(k) *rho_fac(k) / &
- 				lam_s(k)**(4._sp+2.*sp*alpha_s+b_s),0._sp)
-		riaci(k)=max(iice*n_i(k)**2._sp*eii(k) *rho_fac(k) / &
-				lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! snow break-up                                                                  !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- 		rsbrk(k)=max((lambda_s_break/lam_s(k)-1._sp)**ds*q(8,k)/(tsbreak),0._sp)
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-    
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! immersion freezing of rain                                                     !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! 		if(t(k).le.268.15_sp) then
-! 			pgfr(k)=max( mass_imm*(exp(-abigg*(t(k)-ttr))-1._sp)*n_r(k) / &
-! 						(lam_r(k))**(4_sp+dr+alpha_r),0._sp)
-! 			rgfr(k)=num_imm*(exp(-abigg*(t(k)-ttr))-1._sp)*n_r(k)/ &
-! 						(lam_r(k))**(4_sp+alpha_r)
-! 		endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-  
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! collisions between precipitating particles of different species                !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(t(k).lt.268._sp) then
-			pracs(k)=max(n_r(k)*n_s(k)*pi/(4._sp*rho(k))*ers*cs*max((vqs(k)+vqr(k))/8._sp,abs(vqs(k)-vqr(k))) * &
-					( &
-					mass_racs1/(lam_r(k)**(1._sp+alpha_r) *lam_s(k)**(3._sp+alpha_s+ds)) + &
-					mass_racs2/(lam_r(k)**(2._sp+alpha_r) *lam_s(k)**(2._sp+alpha_s+ds)) + &
-					mass_racs3/(lam_r(k)**(3._sp+alpha_r) *lam_s(k)**(1._sp+alpha_s+ds))  &
-					) , 0._sp)  
-				
-	!         pracg(k)=max(n_r(k)*n_g(k)*pi/(4._sp*rho(k))*erg*cg*max((vqg(k)+vqr(k))/8._sp,abs(vqg(k)-vqr(k))) * &
-	!         		( &
-	!         		mass_racg1/(lam_r(k)**(1._sp+alpha_r) *lam_g(k)**(3._sp+alpha_g+dg)) + &
-	!         		mass_racg2/(lam_r(k)**(2._sp+alpha_r) *lam_g(k)**(2._sp+alpha_g+dg)) + &
-	!         		mass_racg3/(lam_r(k)**(3._sp+alpha_r) *lam_g(k)**(1._sp+alpha_g+dg))  &
-	!         		)   , 0._sp)        		
-			psacr(k)=max(n_s(k)*n_r(k)*pi/(4._sp*rho(k))*ers*cr*max((vqr(k)+vqs(k))/8._sp,abs(vqr(k)-vqs(k))) * &
-					( &
-					mass_sacr1/(lam_s(k)**(1._sp+alpha_s) *lam_r(k)**(3._sp+alpha_r+dr)) + &
-					mass_sacr2/(lam_s(k)**(2._sp+alpha_s) *lam_r(k)**(2._sp+alpha_r+dr)) + &
-					mass_sacr3/(lam_s(k)**(3._sp+alpha_s) *lam_r(k)**(1._sp+alpha_r+dr))  &
-					)    , 0._sp)       		
-			rsacr(k)=max(n_s(k)*n_r(k)*pi/(4._sp*rho(k))*ers*max((vqr(k)+vqs(k))/8._sp,abs(vqr(k)-vqs(k))) * &
-					( &
-					num_racs1/(lam_s(k)**(1._sp+alpha_s) *lam_r(k)**(3._sp+alpha_r)) + &
-					num_racs2/(lam_s(k)**(2._sp+alpha_s) *lam_r(k)**(2._sp+alpha_r)) + &
-					num_racs3/(lam_s(k)**(3._sp+alpha_s) *lam_r(k)**(1._sp+alpha_r))  &
-					)    , 0._sp)    
-		
-	!         psacg(k)=max(n_s(k)*n_g(k)*pi/(4._sp*rho(k))*egs_dry(k)*cg*max((vqg(k)+vqs(k))/8._sp,abs(vqg(k)-vqs(k))) * &
-	!         		( &
-	!         		mass_sacg1/(lam_s(k)**(1._sp+alpha_s) *lam_g(k)**(3._sp+alpha_g+dg)) + &
-	!         		mass_sacg2/(lam_s(k)**(2._sp+alpha_s) *lam_g(k)**(2._sp+alpha_g+dg)) + &
-	!         		mass_sacg3/(lam_s(k)**(3._sp+alpha_s) *lam_g(k)**(1._sp+alpha_g+dg))  &
-	!         		)    , 0._sp)       		
-			pgacr(k)=max(n_g(k)*n_r(k)*pi/(4._sp*rho(k))*erg*cr*max((vqr(k)+vqg(k))/8._sp,abs(vqr(k)-vqg(k))) * &
-					( &
-					mass_gacr1/(lam_g(k)**(1._sp+alpha_g) *lam_r(k)**(3._sp+alpha_r+dr)) + &
-					mass_gacr2/(lam_g(k)**(2._sp+alpha_g) *lam_r(k)**(2._sp+alpha_r+dr)) + &
-					mass_gacr3/(lam_g(k)**(3._sp+alpha_g) *lam_r(k)**(1._sp+alpha_r+dr))  &
-					)    , 0._sp)      
-			! set pgacs and rgacs to wet first 		
-			pgacs(k)=max(n_g(k)*n_s(k)*pi/(4._sp*rho(k))*egs_wet*cs*max((vqs(k)+vqg(k))/8._sp,abs(vqs(k)-vqg(k))) * &
-					( &
-					mass_gacs1/(lam_g(k)**(1._sp+alpha_g) *lam_s(k)**(3._sp+alpha_s+ds)) + &
-					mass_gacs2/(lam_g(k)**(2._sp+alpha_g) *lam_s(k)**(2._sp+alpha_s+ds)) + &
-					mass_gacs3/(lam_g(k)**(3._sp+alpha_g) *lam_s(k)**(1._sp+alpha_s+ds))  &
-					)    , 0._sp)       		
-				
-			rgacs(k)=max(n_g(k)*n_s(k)*pi/(4._sp*rho(k))*egs_wet*max((vqs(k)+vqg(k))/8._sp,abs(vqs(k)-vqg(k))) * &
-					( &
-					num_sacg1/(lam_g(k)**(1._sp+alpha_g) *lam_s(k)**(3._sp+alpha_s)) + &
-					num_sacg2/(lam_g(k)**(2._sp+alpha_g) *lam_s(k)**(2._sp+alpha_s)) + &
-					num_sacg3/(lam_g(k)**(3._sp+alpha_g) *lam_s(k)**(1._sp+alpha_s))  &
-					)  , 0._sp)   
-		endif
-        		
-        !rracg?, psacg? pracg? rgacr?   		
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! riming of graupel and accretion of ice                                         !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(q(5,k).gt.0._sp) then
-			pgacw(k)=max(mass_gacw*rho_fac(k)*n_g(k) / &
-					((lam_g(k)+f_g)**(3._sp+b_g+alpha_g))*q(2,k), 0._sp)
-		endif
-		
-		if((q(5,k).gt.0._sp).and.(t(k).lt.ttr)) then
-		
-			! below assuming wet-growth first
-			pgaci(k)=max(mass_gaci*egi_wet*rho_fac(k)*n_g(k) / &
-					((lam_g(k)+f_g)**(3._sp+b_g+alpha_g))*q(6,k), 0._sp)
-					
-			pgwet=(910._sp/(cg*6._sp/pi))**0.625_sp*  &
-				(rho(k)*lv*(q0sat-q(1,k))-ktherm1*tc) / (rho(k)*(lf-cw*tc))*nu_graup + &
-				(pgaci(k)+pgacs(k))*(1._sp-ci*tc/(lf+cw*tc))
-			
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! redefine as dry growth, if water can be frozen without shedding            !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			if((pgacr(k)+pgacw(k)+pgaci(k)+pgacs(k)).gt.pgwet) then
-				! redefine graupel accreting rain so that it is
-				pgshd(k)=max(0._sp,pgacw(k)+pgaci(k)+pgacs(k)-pgwet)
-				pgacr(k)=max(0._sp,pgwet-pgacw(k)-pgaci(k)-pgacs(k))
-			else
-				! dry growth: graupel-ice
-				pgaci(k)=max(mass_gaci*egi_dry(k)*rho_fac(k)*n_g(k) / &
-						((lam_g(k)+f_g)**(3._sp+b_g+alpha_g))*q(6,k), 0._sp)
-									
-				! dry growth: graupel-snow -- mass
-				pgacs(k)=max(n_g(k)*n_s(k)*pi/(4._sp*rho(k))*egs_dry(k)* &
-						cs*max((vqs(k)+vqg(k))/8._sp,abs(vqs(k)-vqg(k))) * &
-						( &
-				 mass_gacs1/(lam_g(k)**(1._sp+alpha_g) *lam_s(k)**(3._sp+alpha_s+ds)) + &
-				 mass_gacs2/(lam_g(k)**(2._sp+alpha_g) *lam_s(k)**(2._sp+alpha_s+ds)) + &
-				 mass_gacs3/(lam_g(k)**(3._sp+alpha_g) *lam_s(k)**(1._sp+alpha_s+ds))  &
-						)    , 0._sp)       		
-				
-				! dry growth: graupel-snow -- number
-				rgacs(k)=max(n_g(k)*n_s(k)*pi/(4._sp*rho(k))*egs_dry(k)* &
-						max((vqs(k)+vqg(k))/8._sp,abs(vqs(k)-vqg(k))) * &
-						( &
-					num_sacg1/(lam_g(k)**(1._sp+alpha_g) *lam_s(k)**(3._sp+alpha_s)) + &
-					num_sacg2/(lam_g(k)**(2._sp+alpha_g) *lam_s(k)**(2._sp+alpha_s)) + &
-					num_sacg3/(lam_g(k)**(3._sp+alpha_g) *lam_s(k)**(1._sp+alpha_s))  &
-						)  , 0._sp)   
-			endif
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-
-    
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! h-m process                                                                    !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(hm_flag) &
-			pihal(k)=max(hm_rate*mi0*(pgacw(k)+psacw(k))*hm_func(t(k)),0._sp)
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	
-
-		
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! melting of ice, snow, and graupel                                              !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(t(k).gt.ttr) then
-			pimlt(k)=q(6,k)/dt ! ice melts instantaneously
-			q(7,k)=0._sp
-			if(q(5,k).gt.0._sp) then
-				pgmlt(k)=max(1._sp/(rho(k)*lf) * &
-					(ktherm1*tc-lv*diff1*rho(k)*(q(1,k)-q0sat))*nu_graup &
-					+ cw*tc/lf*(pgacw(k)+pgacr(k)-pgshd(k)),0._sp)
-			endif
-				
-			psmlt(k)=max(1._sp/(rho(k)*lf) * &
-				(ktherm1*tc-lv*diff1*rho(k)*(q(1,k)-q0sat))*nu_snow &
-				+ cw*tc/lf*(psacw(k)+psacr(k)),0._sp)
-		endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     enddo
     
     
     
     
-    
-    
     ! update variables
-    ! ice number
-    
-    
-    q(7,1:kp)=q(7,1:kp)+((piprm+pihal+picnt+pifrw)/mi0 - riaci - &
-    		(pgaci+psaci+praci_g+praci_s)*q(7,1:kp)/(q(6,1:kp)+qsmall)  &
-    		-riaci - rsaut)*dt
-    where(pimlt.gt.0._sp)
-    	q(7,1:kp)=0._sp
-    end where
-    ! snow number
-    q(8,1:kp)=q(8,1:kp)+(riacr_s+rsaut+rsbrk &
-    			-(pssub+psmlt+pgaut)*q(8,1:kp)/(q(4,1:kp)+qsmall) &
-    			-(rgacs+rsacr+rsacs))*dt
-    ! graupel number
-    q(9,1:kp)=q(9,1:kp)+(pgaut*q(9,1:kp)/(q(5,1:kp)+qsmall) + rsacr+riacr_g+rgfr &
-    			-(pgsub+pgmlt)*q(9,1:kp)/(q(5,1:kp)+qsmall))*dt
-    			
-
     ! vapour mass
-    q(1,1:kp)=q(1,1:kp)+(pgsub+pssub+prevp+pisub-(psdep+pidep+piprm+pgdep))*dt
+    q(1,1:kp)=q(1,1:kp)+(pgsub+pssub+pisub-(psdep+pidep+piprm+pgdep))*dt
     ! liquid mass
     q(2,1:kp)=q(2,1:kp)-((pgacw+praut+psacw+pracw+piacw+pihal+picnt+pifrw))*dt
     ! rain mass
     q(3,1:kp)=q(3,1:kp)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
-    			(pgacr+prevp+pgfr+psacr+piacr_g+piacr_s))*dt
-    ! snow mass
-    q(4,1:kp)=q(4,1:kp)+(psaut+psdep+psaci+praci_s+piacr_s+psacw-(pssub+pgacs+pracs+pgaut+psmlt))*dt
-    ! graupel mass
-    q(5,1:kp)=q(5,1:kp)+(pgaci+pgacw+pgacs+pgacr+psacr+pracs+pgaut+pgfr+praci_g+piacr_g+pgdep- &
-    				(pgsub+pgmlt+pgshd))*dt
-!     if(sum(piacw).gt.0._sp) stop
-    ! ice mass
-    q(6,1:kp)=q(6,1:kp)+(pidep+piprm+pihal+picnt+piacw- &
-    			(psaut+pgaci+psaci+pisub+pifrw+pimlt+praci_g+praci_s))*dt
-    			
-    q=max(q,0._sp)	    
+    			(pgacr+pgfr+psacr+piacr_g+piacr_s))*dt
+    prevp=min(prevp,q(3,1:kp)/dt)
+    q(3,1:kp)=q(3,1:kp)-prevp*dt
+    q(1,1:kp)=q(1,1:kp)+prevp*dt
+    
+    ! liquid number
+    q(4,1:kp)=q(4,1:kp)+(rcwaut+rcwacr+rcwsel)*dt
+    ! rain number
+    q(5,1:kp)=q(5,1:kp)+(rraut+rrsel-prevp*(q(5,1:kp)/(q(3,1:kp)+qsmall)))*dt
+    
+    where(q(2,:) .lt. qsmall)
+        q(4,:) = 0.0_sp
+    end where
+    where(q(3,:) .lt. qsmall)
+        q(5,:) = 0.0_sp
+    end where
+
+    q=max(q,0._sp)	 
+    
+
+
+
     
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! advection rain 0th order Bott, a.k.a. upstream advection                           !
@@ -891,79 +645,41 @@
 		do iter=1,n_step
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqr,q(3,:),.false.)
 		enddo
-	endif
-	
-    ! graupel 
-    if(sum(q(5,1:kp)).gt.qsmall) then
-		where(isnan(vqg))
-			vqg=0_sp
+		where(isnan(vnr))
+			vnr=0_sp
 		end where
-		vqg(-o_halo:0)=vqg(1)
-		vqg(kp+1:kp+o_halo)=vqg(kp)
-		n_step=max(ceiling(maxval(vqg)*dt/dz*2_sp),1)
-		vqg(-o_halo:kp+o_halo-1)=-vqg(-o_halo+1:kp+o_halo)
+		vnr(-o_halo:0)=vnr(1)
+		vnr(kp+1:kp+o_halo)=vnr(kp)
+		n_step=max(ceiling(maxval(vnr)*dt/dz*2_sp),1)
+		vnr(-o_halo:kp+o_halo-1)=-vnr(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqg,q(5,:),.false.)
-		enddo
-		where(isnan(vng))
-			vng=0_sp
-		end where
-		vng(-o_halo:0)=vng(1)
-		vng(kp+1:kp+o_halo)=vng(kp)
-		n_step=max(ceiling(maxval(vng)*dt/dz*2_sp),1)
-		vng(-o_halo:kp+o_halo-1)=-vng(-o_halo+1:kp+o_halo)
-		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vng,q(9,:),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vnr,q(5,:),.false.)
 		enddo
 	endif
-	
-    ! snow 
-    if(sum(q(4,1:kp)).gt.qsmall) then
-		where(isnan(vqs))
-			vqs=0_sp
+    ! cloud 
+    if(sum(q(2,1:kp)).gt.qsmall) then
+		where(isnan(vqc))
+			vqc=0_sp
 		end where
-		vqs(-o_halo:0)=vqs(1)
-		vqs(kp+1:kp+o_halo)=vqs(kp)
-		n_step=max(ceiling(maxval(vqs)*dt/dz*2_sp),1)
-		vqs(-o_halo:kp+o_halo-1)=-vqs(-o_halo+1:kp+o_halo)
-		do iter=1,n_step		
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqs,q(4,:),.false.)
-		enddo
-		where(isnan(vns))
-			vns=0_sp
-		end where
-		vns(-o_halo:0)=vns(1)
-		vns(kp+1:kp+o_halo)=vns(kp)
-		n_step=max(ceiling(maxval(vns)*dt/dz*2_sp),1)
-		vns(-o_halo:kp+o_halo-1)=-vns(-o_halo+1:kp+o_halo)
+		vqc(-o_halo:0)=vqc(1)
+		vqc(kp+1:kp+o_halo)=vqc(kp)
+		n_step=max(ceiling(maxval(vqc)*dt/dz*2_sp),1)
+		vqc(-o_halo:kp+o_halo-1)=-vqc(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vns,q(8,:),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqc,q(2,:),.false.)
+		enddo
+		where(isnan(vnc))
+			vnc=0_sp
+		end where
+		vnc(-o_halo:0)=vnc(1)
+		vnc(kp+1:kp+o_halo)=vnc(kp)
+		n_step=max(ceiling(maxval(vnc)*dt/dz*2_sp),1)
+		vnc(-o_halo:kp+o_halo-1)=-vnc(-o_halo+1:kp+o_halo)
+		do iter=1,n_step
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vnc,q(4,:),.false.)
 		enddo
 	endif
-    ! ice
-    if(sum(q(6,1:kp)).gt.qsmall) then     
-		where(isnan(vqi))
-			vqi=0_sp
-		end where
-		vqi(-o_halo:0)=vqi(1)
-		vqi(kp+1:kp+o_halo)=vqi(kp)
-		n_step=max(ceiling(maxval(vqi)*dt/dz*2_sp),1)
-		vqi(-o_halo:kp+o_halo-1)=-vqi(-o_halo+1:kp+o_halo)
-		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqg,q(6,:),.false.)
-		enddo
-		where(isnan(vni))
-			vni=0_sp
-		end where
-		vni(-o_halo:0)=vni(1)
-		vni(kp+1:kp+o_halo)=vni(kp)
-		n_step=max(ceiling(maxval(vni)*dt/dz*2_sp),1)
-		vni(-o_halo:kp+o_halo-1)=-vni(-o_halo+1:kp+o_halo)
-		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vng,q(7,:),.false.)
-		enddo
-	endif
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
     
     
@@ -971,7 +687,94 @@
     end subroutine w_microphysics_1d
     
     
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates variables for Seifert and Beheng (2001) autoconversion scheme
+	!>@param[inout] praut, pracw, rcwaut, rcwacr, rraut, rrsel, rwsel: variables for SB 
+	!>@param[in] qc: qcloud
+	!>@param[in] nc: ncloud
+	!>@param[in] qr: qrain
+	!>@param[in] nr: nrain
+	!>@param[in] rho: density of air
+	!>@param[in] dt: timestep
+    subroutine seifert_beheng(praut,pracw, rcwaut, rcwacr, rraut, &
+		                    rrsel, rcwsel, qc,nc,qr,nr,rho,dt)
+	use advection_1d
+    implicit none
+    ! arguments:
+    real(sp), intent(inout) :: praut,pracw, rcwaut, rcwacr, rraut, &
+		                    rrsel, rcwsel
+	real(sp), intent(in) :: qc,nc,qr,nr,rho, dt
+	real(sp) :: lc, lr, nc1,nr1,xc_bar, phi_au, phi_ac, b_slope, tau, factor1, factor2, &
+	            test
+	
+	
+	    praut=0._sp
+	    pracw=0._sp
+	    rcwaut=0._sp
+	    rcwacr=0._sp
+	    rraut=0._sp
+	    rrsel=0._sp
+	    rcwsel=0._sp
+	    
+	    lc=qc*rho
+	    lr=qr*rho
+	    
+	    nc1=max(nc*rho,lc/xstar)
+	    nr1=max(nr*rho,1._sp)
+	    
+		b_slope=((nc1+1.e-20_sp)/(lc+1.e-20_sp))*(gam2c+1.e-20_sp)/(gam1c +1.e-20_sp)
+		xc_bar=gam2c/(gam1c*b_slope+1.e-20_sp)
+		
+		tau=1._sp-lc/(lc+lr+1.e-20_sp)
+		tau=max(tau,1.e-6_sp)
+		phi_au=600._sp*tau**0.68*(1._sp-tau**0.68)**3
+		phi_ac=(tau/(tau+5.e-4_sp))**4
+
+		if (lc .gt. qsmall) then
+            ! autoconversion: equation a1 in Seifert and Beheng (2001, atmos res)
+            praut = kc/(20._sp*xstar)*(alpha_c+2._sp)*(alpha_c+4._sp)/(alpha_c+1._sp)**2 * &
+                    (lc*xc_bar)**2*(1._sp+phi_au/(1._sp-tau+1.e-20_sp)**2)
+            
+            ! accretion: equation a2 in Seifert and Beheng (2001, atmos res)
+            pracw=kr*lc*lr*phi_ac
+        
+            ! cloud number autoconversion: equation a5 in Seifert and Beheng (2001, atmos res)
+            rcwaut=-2._sp/xstar*praut
+            ! cloud num accretion: equation a6 in Seifert and Beheng (2001, atmos res)
+            rcwacr=-1._sp/xc_bar*pracw
+            ! rain num autoconversion: equation a7 in Seifert and Beheng (2001, atmos res)
+            rraut=-1._sp/2._sp*rcwaut
+            ! rain num self collection: equation a8 in Seifert and Beheng (2001, atmos res)
+            rrsel=-kr*nr*lr
+            ! cloud num self collection: equation a9 in Seifert and Beheng (2001, atmos res)
+            rcwsel=-kr*(alpha_c+2._sp)/(alpha_c+1._sp)*lc**2-rcwaut
+
+!             factor1=min(lc/dt,praut+pracw)
+!             factor2=min(nc1/dt,-(rcwaut+rcwacr+rcwsel))
+! 
+!             praut=praut/factor1
+!             pracw=pracw/factor1
+!             rcwaut=rcwaut/factor2
+!             rcwacr=rcwacr/factor2
+!             rcwsel=rcwsel/factor2
+
+            
+            praut=praut/rho
+            pracw=pracw/rho
+            rcwaut=rcwaut/rho
+            rcwacr=rcwacr/rho
+            rraut=rraut/rho   
+            rrsel=rrsel/rho
+            rcwsel=rcwsel/rho
+        endif
+        
+
+    end subroutine seifert_beheng  
     
+    
+      
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! saturation vapour pressure over liquid                                       !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
