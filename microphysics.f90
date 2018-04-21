@@ -328,7 +328,7 @@
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice
     ! locals:
-    integer(i4b) :: k,iter, n_step
+    integer(i4b) :: k,k1,iter, n_step
     real(sp) :: temp, qtot,qaut, a, b, ab_ice, ab_liq, ice_dep,snow_dep,graup_dep, &
     			nu_ice, nu_snow, nu_graup, diff1, ktherm1, tc, nu_vis, sc, nu_rain, rain_evap, &
     			sb_aut, sb_acr, sb_cwaut, sb_cwacr, sb_raut, sb_rsel, sb_cwsel
@@ -529,7 +529,8 @@
 
 
 
-	    if((q(2,k) .gt. 0._sp) .and. (q(4,k) .lt. 1._sp)) then
+        k1=max(k-1,1)
+	    if((q(2,k) .gt. qsmall) .and. (q(2,k1) .lt. qsmall)) then
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Bulk Aerosol Activation - number of drops
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
