@@ -22,13 +22,16 @@
 	!>@param[in] o_halo: halos required for advection scheme
 	!>@param[in] runtime
 	!>@param[in] dt - timestep
+	!>@param[in] cvis: coefficient for viscosity
 	!>@param[in] dx,dz - grid spacing
-	!>@param[inout] q, theta, pressure, x,xn,z,zn, temperature, rho, u,w
+	!>@param[inout] q, qold, theta, th_old, pressure, 
+	!>          x,xn,z,zn, temperature, rho, u,w, delsq, vis
 	!>@param[inout] precip
 	!>@param[inout] new_file
 	!>@param[inout] micro_init - flag to initialise microphysics
 	!>@param[in] advection_scheme
 	!>@param[in] monotone - flag for monotonic advection
+	!>@param[in] viscous_dissipation - flag for smagorinsky-lilly scheme
 	!>@param[in] microphysics_flag - flag for calling microphysics
 	!>@param[in] hm_flag - flag for switching on / off hm process
 	!>@param[in] theta_flag - flag for advecting theta dry
@@ -44,9 +47,11 @@
 	!>@param[in] z_offset
 	!>@param[inout] therm_init
     subroutine model_driver_2d(nq,nprec,ip,kp,ord,o_halo,runtime, &
-                               dt, &
-                               q,precip,theta,p,dx,dz,x,xn,z,zn,t,rho,&
-                               u,w,new_file,micro_init,advection_scheme, monotone, &
+                               dt,cvis,  &
+                               q,qold, precip,theta,th_old, p,dx,dz,x,xn,z,zn,t,rho,&
+                               u,w,delsq, vis, &
+                               new_file,micro_init,advection_scheme, monotone, &
+                               viscous_dissipation, &
                                microphysics_flag,hm_flag,theta_flag,mass_ice, &
                                ! variables associated with thermal properties
                                k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & 
@@ -61,15 +66,17 @@
 
     implicit none
     integer(i4b), intent(in) :: nq,nprec,ip,kp, ord, o_halo, advection_scheme
-    real(sp), intent(in) :: runtime, dt, dx,dz
-    real(sp), dimension(nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: q
+    real(sp), intent(in) :: runtime, dt, dx,dz, cvis
+    real(sp), dimension(nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: q, &
+                                                                                    qold
     real(sp), dimension(nprec,1:kp,1:ip), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: z,zn
     real(sp), dimension(-o_halo+1:ip+o_halo), intent(inout) :: x,xn
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: theta, p, &
-    																			t,rho,u,w
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
+                                    theta, th_old, p, t,rho,u,w
+    real(sp), dimension(1:kp,1:ip), intent(inout) :: delsq, vis
     logical, intent(inout) :: new_file, micro_init,therm_init
-    logical, intent(in) :: monotone,hm_flag,theta_flag
+    logical, intent(in) :: monotone,hm_flag,theta_flag, viscous_dissipation
     integer(i4b), intent(in) :: microphysics_flag
     real(sp), intent(in) :: mass_ice
     
@@ -79,9 +86,10 @@
     real(sp), intent(in) :: w_peak, z_offset
 
     ! local variables
-    integer(i4b) :: nt, i, j, nsteps, iter
+    integer(i4b) :: nt, i, j, l,nsteps, iter
     real(sp) :: time
 
+    
     nt=ceiling(runtime / real(dt,kind=sp) )
     do i=1,nt
     	time=real(i-1,sp)*dt
@@ -149,17 +157,56 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! mixing                                                                         !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(viscous_dissipation) then
+            call smagorinsky(ip,kp,o_halo,cvis,u,w,vis,dx,dz)
+            do l=1,5
+                ! set previous values (for dissipation)
+                qold=q
+                th_old=theta
+                call dissipation(ip,kp,o_halo,dt,0.5_sp*(theta+th_old),delsq,dx,dz)
+                theta(1:kp,1:ip)=theta(1:kp,1:ip)+dt/5._sp*delsq*vis
+                do j=1,nq
+                    call dissipation(ip,kp,o_halo,dt,0.5_sp*(q(j,:,:)+qold(j,:,:)), &
+                        delsq,dx,dz)
+                    q(j,1:kp,1:ip)=q(j,1:kp,1:ip)+dt/5._sp*delsq*vis
+                enddo
+                
+                
+                if(microphysics_flag .eq. 2) then
+                    ! inhomogeneous mixing assumption:
+                    q(4,1:kp,1:ip)=min(max(qold(4,1:kp,1:ip)* &
+                        (q(2,1:kp,1:ip)/qold(2,1:kp,1:ip)+1.e-15_sp),0._sp), &
+                         q(4,1:kp,1:ip))
+                endif
+                
+                th_old=theta
+                qold=q
+            enddo
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
         ! solve microphysics. initialise constants that are commonly used, if needed
         if (microphysics_flag .eq. 1) then
 			call microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
-						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice)		
+						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
+						   theta_flag)		
 						   
 						   
 		else if (microphysics_flag .eq. 2) then
 			call w_microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
-						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice)		
+						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
+						   theta_flag)		
 						   
 		endif       
 

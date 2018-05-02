@@ -36,14 +36,14 @@
         ! namelists                                                            !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! define namelist for environment
-        namelist /sounding_spec/ adiabatic_prof, adiabatic_frac, &
+        namelist /sounding_spec/ adiabatic_prof, adiabatic_frac, above_cloud, &
         					psurf, tsurf, t_cbase, t_ctop, &
         					n_levels_s, q_read, theta_read, rh_read, z_read
         ! define namelist for run parameters
-        namelist /run_vars/ outputfile, runtime, ip, kp, dx, dz, dt, &
+        namelist /run_vars/ outputfile, runtime, ip, kp, dx, dz, dt, cvis, &
                     nq, nprec, &
         			advection_scheme, ord, halo, &
-        			monotone, microphysics_flag, &
+        			monotone, viscous_dissipation, microphysics_flag, &
         			bam_nmlfile, hm_flag, theta_flag, &
         			drop_num_init, num_drop, ice_init, &
         			num_ice, mass_ice
@@ -84,11 +84,13 @@
         call calc_profile_2d(nq,nprec,n_levels_s,psurf,tsurf,t_cbase,t_ctop, &
         					adiabatic_prof, adiabatic_frac, &
         					q_type,q_init, z_read,theta_read, &
-                            q_read,ip,kp,o_halo,dx,dz,grid1%q, grid1%precip, &
-                            grid1%theta, grid1%p,grid1%x,grid1%xn, &
+                            q_read,ip,kp,o_halo,dx,dz,grid1%q, grid1%qold, &
+                            grid1%precip, &
+                            grid1%theta, grid1%th_old, grid1%p,grid1%x,grid1%xn, &
                             grid1%z,grid1%zn,grid1%t,grid1%rho,grid1%u,grid1%w, &
+                            grid1%delsq,grid1%vis, &
                             drop_num_init, num_drop, ice_init, num_ice, mass_ice, &
-                            microphysics_flag)
+                            microphysics_flag, above_cloud)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -97,12 +99,15 @@
         ! run the model                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         io1%new_file=.true.
-        call model_driver_2d(nq,nprec,ip,kp,ord,o_halo,runtime,dt, &
-        					grid1%q,grid1%precip,grid1%theta, &
+        call model_driver_2d(nq,nprec,ip,kp,ord,o_halo,runtime,dt, cvis, &
+        					grid1%q,grid1%qold, &
+        					grid1%precip,grid1%theta, grid1%th_old, &
                             grid1%p,dx,dz,grid1%x,grid1%xn,grid1%z,grid1%zn,&
-							grid1%t,grid1%rho,grid1%u,grid1%w,io1%new_file, &
+							grid1%t,grid1%rho,grid1%u,grid1%w,grid1%delsq,grid1%vis, &
+							io1%new_file, &
                             micro_init,advection_scheme, &
-                            monotone,microphysics_flag,hm_flag,theta_flag, &
+                            monotone,viscous_dissipation, &
+                            microphysics_flag,hm_flag,theta_flag, &
                             mass_ice, &
                             k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & ! variables associated 
                             del_c_s,del_c_t,epsilon_therm,w_peak, &

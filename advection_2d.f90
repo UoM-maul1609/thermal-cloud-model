@@ -6,7 +6,7 @@
     use nrtype
     
     private
-    public :: mpdata, first_order_upstream_2d
+    public :: mpdata, first_order_upstream_2d, dissipation, smagorinsky
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -75,10 +75,12 @@
 	real(sp) :: fip,fim,small=1e-15_sp, &
 			u_j_bar1, u_div1, u_j_bar2, u_div2, u_j_bar3, u_div3, &
 			psi_i_max, psi_i_min, psi_ip_max,psi_ip_min, beta_i_down, beta_i_up, &
-			beta_ip_down, beta_ip_up
+			beta_ip_down, beta_ip_up, minglobal
 	integer(i4b) i,j,k,it
 	logical :: monotone
 	
+	minglobal=minval(q_k(:,:))
+	q_k=q_k-minglobal
 	if(sum(q_k).lt.small) return
 	
 	! zero arrays
@@ -285,7 +287,84 @@
     ! halos
     q_k(:,-o_halo+1:0)=q_k(:,ip-o_halo+1:ip)
     q_k(:,ip+1:ip+o_halo)=q_k(:,1:o_halo)
+    
+    q_k=q_k+minglobal
 
 	end subroutine mpdata
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates del2 of prognostic variable
+	!>@param[in] ip: number of let-right points
+	!>@param[in] kp: ditto for up-down
+	!>@param[in] o_halo: halos required for advection scheme
+	!>@param[in] dt:  timestep
+	!>@param[in] f: prognostic variable
+	!>@param[inout] delsq: delsq of f
+	!>@param[in] dx,dz: grid spacing
+	!>calculates del**2:
+	!>\f$ visterm = \frac{\partial ^2}{\partial x^2} f + 
+	!> \frac{\partial ^2}{\partial z^2} f \f$
+    subroutine dissipation(ip,kp,o_halo,dt,f,delsq,dx,dz)
+
+		use nrtype
+		implicit none
+		integer(i4b), intent(in) :: ip,kp,o_halo
+		real(sp), intent(in) :: dt,dx,dz
+		real(sp), intent(in), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
+																				f
+		real(sp), intent(inout), dimension(1:kp,1:ip) :: delsq
+
+			
+		
+		
+		! calculate del^2 using 2nd order difference 
+		! (central difference of forward and backward):
+		delsq(1:kp,1:ip)  =(f(1:kp,2:ip+1)-2._sp*f(1:kp,1:ip)+f(1:kp,0:ip-1))/dx**2 
+			  
+		delsq(1:kp,1:ip)  = delsq(1:kp,1:ip) + &
+		    (f(2:kp+1,1:ip)-2._sp*f(1:kp,1:ip)+f(0:kp-1,1:ip))/dz**2 
+
+	end subroutine dissipation
+
+	
+
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates smagorinsky-lilly viscosity
+	!>@param[in] ip: number of left-right points
+	!>@param[in] kp: ditto for up-down
+	!>@param[in] o_halo: halos required for advection scheme
+	!>@param[in] cvis:  coefficient for viscosity
+	!>@param[in] u,w: u and w winds
+	!>@param[inout] vis: viscosity
+	!>@param[in] dx,dz
+	!>calculates smagorinsky-lilly viscosity:
+	!>\f$ visco = C_s^2\Delta x\Delta y|S|\f$
+    subroutine smagorinsky(ip,kp,o_halo,cvis,u,w,vis,dx,dz)
+
+		use nrtype
+		implicit none
+		integer(i4b), intent(in) :: ip,kp,o_halo
+		real(sp), intent(in) :: cvis, dx, dz
+		real(sp), intent(in), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
+																		u,w
+		real(sp), intent(inout), dimension(1:kp,1:ip) :: vis
+		! local variables:
+		integer(i4b) :: j, i
+			
+		
+		
+		! calculate viscosity using centred differences:
+		vis(1:kp,1:ip) = cvis**2._sp*dx*dz* &
+		sqrt( ( (u(1:kp,2:ip+1)-u(1:kp,0:ip-1))/ dx )**2 + &
+			( (w(2:kp+1,1:ip)-w(0:kp-1,1:ip))/ dz )**2 + &
+			0.5_sp*( (u(2:kp+1,1:ip)-u(0:kp-1,1:ip))/ dz+ &
+			(w(1:kp,2:ip+1)-w(1:kp,0:ip-1))/ dx )**2 )
+
+	end subroutine smagorinsky
+		
     end module advection_2d

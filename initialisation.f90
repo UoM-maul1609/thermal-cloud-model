@@ -67,20 +67,24 @@
 	!>@param[in] o_halo number of extra grid levels required for advection
 	!>@param[in] dx horizontal resolution of grid
 	!>@param[in] dz vertical resolution of grid
-	!>@param[inout] q, precip, theta, pressure, x,xn,z,zn, temperature, rho,u,w
+	!>@param[inout] q, qold, precip, theta, th_old, 
+	!>             pressure, x,xn,z,zn, temperature, rho,u,w, delsq, vis
 	!>@param[in] drop_num_init: flag to initialise number of drops where liquid water>0
 	!>@param[in] number conc of drops #/kg
 	!>@param[in] ice_init: flag to initialise ice crystals in model
 	!>@param[in] number conc of ice crystals #/kg
 	!>@param[in] mass of a single ice crystal kg.
 	!>@param[in] microphysics_flag: flag for kind of microphysics used
+	!>@param[in] above_cloud: flag for assumption above cloud
     subroutine calc_profile_2d(nq,nprec,n_levels,psurf,tsurf,t_cbase, &
     						t_ctop, adiabatic_prof, adiabatic_frac,q_type,q_init, &
                              z_read,theta_read,q_read, &
-                             ip,kp,o_halo,dx,dz,q,precip,theta,p,x,xn,z,zn,t,rho,u,w, &
+                             ip,kp,o_halo,dx,dz,q,qold, &
+                             precip,theta,th_old, p,x,xn,z,zn,t,rho,u,w,&
+                             delsq, vis, &
                              drop_num_init, num_drop, &
                              ice_init, num_ice, mass_ice, &
-                             microphysics_flag)
+                             microphysics_flag, above_cloud)
     use nrtype
     use nr, only : locate, polint, rkqs, odeint, zbrent
     use constants
@@ -94,15 +98,17 @@
     real(sp), dimension(nq,n_levels), intent(in) :: q_read
     integer(i4b), dimension(nq), intent(in) :: q_type
     logical, dimension(nq), intent(in) :: q_init
-    integer(i4b), intent(in) :: ip, kp, microphysics_flag
+    integer(i4b), intent(in) :: ip, kp, microphysics_flag, above_cloud
     real(sp), intent(in) :: dx, dz, psurf, tsurf, t_cbase, t_ctop
     logical, intent(in) :: adiabatic_prof, ice_init, drop_num_init
     real(sp), intent(in) :: adiabatic_frac
     real(sp), intent(in) :: num_drop, num_ice, mass_ice
     ! inouts
-    real(sp), dimension(:,:), allocatable, intent(inout) :: theta, p, t, rho,u, w
+    real(sp), dimension(:,:), allocatable, intent(inout) :: theta, th_old, &
+                                                     p, t, rho,u, w,delsq, &
+                                                            vis
     real(sp), dimension(:), allocatable, intent(inout) :: x, z,xn,zn
-    real(sp), dimension(:,:,:), allocatable, intent(inout) :: q, precip
+    real(sp), dimension(:,:,:), allocatable, intent(inout) :: q, qold, precip
     ! local variables:
     integer(i4b) :: i,j, iloc, AllocateStatus, istore,istore2
     real(sp) :: var, dummy
@@ -115,7 +121,11 @@
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( q(1:nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( qold(1:nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( theta(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( th_old(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( p(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -134,6 +144,10 @@
     allocate( u(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( w(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( delsq(1:kp,1:ip), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( vis(1:kp,1:ip), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 
 
@@ -241,20 +255,52 @@
 			endif
 		enddo
 
-		! integrate going upwards - dry adiabatic layer
-		theta1=t_ctop*(1.e5_sp/p_ctop)**(ra/cp)
-		istore2=istore2+1
-		do i=istore2,kp+o_halo-1
-			z11=z(i)
-			z22=z(i+1)
-			p11=p(i,1)
-			htry=dz
-			hmin=1.e-2_sp
-			call odeint(p11,z11,z22,eps2,htry,hmin,hydrostatic1a,rkqs)
-			p(i+1,:)=p11(1)
-		enddo
-		t(istore2:kp+o_halo,:)=theta1*(p(istore2:kp+o_halo,:)/1.e5_sp)**(ra/cp)
 
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! integrate going upwards - above cloud-top
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		select case (above_cloud)
+		case (0) ! dry above, conserving theta
+            theta1=t_ctop*(1.e5_sp/p_ctop)**(ra/cp)
+            istore2=istore2+1
+            do i=istore2,kp+o_halo-1
+                z11=z(i)
+                z22=z(i+1)
+                p11=p(i,1)
+                htry=dz
+                hmin=1.e-2_sp
+                call odeint(p11,z11,z22,eps2,htry,hmin,hydrostatic1a,rkqs)
+                p(i+1,:)=p11(1)
+            enddo
+            t(istore2:kp+o_halo,:)=theta1*(p(istore2:kp+o_halo,:)/1.e5_sp)**(ra/cp)
+        case (1)  ! rh=0.95 above, conserving theta_q
+        
+            do i=istore2,kp+o_halo-1
+                z11=z(i)
+    			z22=z(i+1)
+                p11=p(i,1)
+                htry=dz
+                hmin=1.e-2_sp
+                call odeint(p11,z11,z22,eps2,htry,hmin,hydrostatic2a,rkqs)
+                p(i+1,:)=p11(1)
+                t(i+1,:)=theta_surf*(p(i+1,:)/1.e5_sp)**(ra/cp)
+                t1old=t(i,1)
+                p111=p(i+1,1)
+                t(i+1,:)=zbrent(calc_theta_q,t(i+1,1),t1old*1.01_sp,1.e-5_sp)
+            
+                q(1,i,:)=0.95_sp*eps1*svp_liq(t(i,1))/ &
+                                    (p(i,1)-svp_liq(t(i,1)))
+            enddo
+        case default
+            print *,'error above_cloud: ',above_cloud
+            stop
+        end select
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
 		! initialise ice crystals
 		if(ice_init .and. (microphysics_flag .eq. 1)) then
             where(t(istore:istore2,:).lt.ttr)

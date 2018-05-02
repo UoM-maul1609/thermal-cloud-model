@@ -14,10 +14,10 @@ FFLAGS2 =  $(DEBUG) -O0 -o
 
 
 micro_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
+				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
 				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ)
 	$(AR) rc micro_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
+				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
 				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ)
 locate.$(OBJ)	: locate.f90
 	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
@@ -33,6 +33,8 @@ rkqs.$(OBJ)	: rkqs.f90
 	$(FOR) rkqs.f90 $(FFLAGS)rkqs.$(OBJ)	
 rkck.$(OBJ)	: rkck.f90
 	$(FOR) rkck.f90 $(FFLAGS)rkck.$(OBJ)	
+dfridr.$(OBJ)	: dfridr.f90
+	$(FOR) dfridr.f90 $(FFLAGS)dfridr.$(OBJ)	
 odeint.$(OBJ)	: odeint.f90
 	$(FOR) odeint.f90 $(FFLAGS)odeint.$(OBJ)	
 zbrent.$(OBJ)	: zbrent.f90

@@ -7,12 +7,14 @@
 	dx=50.,
 	dz=50.,
 	dt=10.,
+	cvis=0.2,
  	nq = 5, ! number of q variables
     nprec=1, ! number of precipitation types
 	advection_scheme=1, ! 0=upstream, 1=mpdata, 2=bott - these options aren't all coded
 	ord=8,		     ! order of advection for bott scheme (except precip)
 	halo=0,
 	monotone=.true.,    ! monotone advection (except precip)
+	viscous_dissipation=.false., ! flag for using smagorinsky-lilly scheme
 	microphysics_flag=2, ! flag for microphysics: 0 (no micro); 1 (bulk scheme #1)
 	                     ! 2 (bulk scheme #2)
 	bam_nmlfile='wmm/bam/namelist.in', ! filename of bam namelist
