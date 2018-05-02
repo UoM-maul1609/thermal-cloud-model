@@ -264,8 +264,9 @@
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] theta_flag: whether to alter theta
     subroutine w_microphysics_2d(nq,ip,kp,o_halo,dt,dz,q,precip,theta,p, z,t,rho,w, &
-    						micro_init,hm_flag, mass_ice)
+    						micro_init,hm_flag, mass_ice, theta_flag)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ip,kp, o_halo
@@ -276,7 +277,7 @@
     					theta, p, t, rho
     real(sp), dimension(-o_halo+1:kp+o_halo) :: z
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
-    logical, intent(in) :: hm_flag
+    logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice
 
@@ -286,7 +287,7 @@
 	do i=1,ip
 		call w_microphysics_1d(nq,kp,o_halo,dt,dz,q(:,:,i),precip(:,:,i),theta(:,i),p(:,i), &
 							z(:),t(:,i),rho(:,i),w(:,i), &
-    						micro_init,hm_flag, mass_ice)
+    						micro_init,hm_flag, mass_ice, theta_flag)
 	enddo
 
 
@@ -313,9 +314,11 @@
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] theta_flag: whether to alter theta
     subroutine w_microphysics_1d(nq,kp,o_halo,dt,dz,q,precip,theta,p, z,t,rho,u, &
-    						micro_init,hm_flag, mass_ice)
+    						micro_init,hm_flag, mass_ice,theta_flag)
 	use advection_1d
+	use nr, only : dfridr
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, kp, o_halo
@@ -324,7 +327,7 @@
     real(sp), dimension(1,1:kp), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: theta, p, z, t, rho
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
-    logical, intent(in) :: hm_flag
+    logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice
     ! locals:
@@ -386,7 +389,7 @@
 	                                        vqc, vnc
 	! coalescence efficiencies
 	real(sp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
-	real(sp) :: qold
+	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
@@ -454,7 +457,7 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! some commonly used variables that depend on prognostics                            !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    t=theta*(p/1e5_sp)**(ra/cp) ! temperature
+    t=theta*(p/1.e5_sp)**(ra/cp) ! temperature
     rho=p / (ra*t) ! air density    
     rho_fac=(rho0/rho(1:kp))**0.5_sp
     ! rain n0, lambda
@@ -480,11 +483,10 @@
     
     ! cloud
     vqc(1:kp)=max(fall_q_c*rho_fac * lam_c**(1._sp+alpha_c+1._sp) / &
-    	(lam_c+f_c)**(1._sp+alpha_c+1._sp+b_c), 0._sp)
+    	(lam_c+f_c)**(1._sp+alpha_c+1._sp+b_c), 1.e-3_sp)
     
     vnc(1:kp)=max(fall_n_c*rho_fac * lam_c**(1._sp+alpha_c) / &
-    	(lam_c+f_c)**(1._sp+alpha_c+b_c), 0._sp)
-    	
+    	(lam_c+f_c)**(1._sp+alpha_c+b_c), 1.e-3_sp)
     ! coalescence efficiencies
     egi_dry=0.2_sp*exp(0.08*(t(1:kp)-ttr))
     egs_dry=0.2_sp*exp(0.08*(t(1:kp)-ttr))
@@ -500,31 +502,39 @@
     
     ! loop over all levels
     do k=1,kp
-        
-        
-
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! condensation of liquid water                                                   !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! smr at 0c
 		!q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
 		q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
+    	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
+
+        des_dt=dfridr(svp_liq,t(k),1.e0_sp,err)
+        dqs_dt=eps1*p(k)*des_dt/(p(k)-svp_liq(t(k)))**2
+        qold=q(2,k)
+        qtot=q(1,k)+q(2,k)
+		
+        q(2,k)=q(1,k)+q(2,k)-smr(k)
+        if (theta_flag) q(2,k)=q(2,k)+(lv/cp*q(2,k))*dqs_dt / (1._sp+lv/cp*dqs_dt)
+        q(2,k)=max(q(2,k),0._sp)
+        t(k)=t(k)
+        if(theta_flag) t(k)=t(k)+lv/cp*(q(2,k)-qold)
+		
 		tc=t(k)-ttr
     	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
     	q0sat=smr(k)	
     	smr_i(k)=eps1*svp_ice(t(k))/(p(k)-svp_ice(t(k))) ! saturation mixing ratio - ice	
     	
-    	qtot=q(1,k)+q(2,k)
-    	qold=q(3,k)
-    	if(smr(k).lt.qtot) then
-    		q(2,k)=qtot-smr(k)
-    		q(1,k)=smr(k)
-    	else
-    		q(1,k)=qtot
-    		q(2,k)=0._sp
-    	endif
+    	cond=(q(2,k)-qold)
+    	q(1,k)=q(1,k)-cond
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+        
+        ! inhomogeneous mixing -https://journals.ametsoc.org/doi/pdf/10.1175/2007JAS2374.1
+ !        if(q(2,k)<qold) then
+!             q(4,k)=q(4,k)*(q(2,k)/qold)**1._sp
+!         endif
+        
 
 
 
@@ -548,10 +558,15 @@
                         w_test, t_test,p_test, a_eq_7, b_eq_7, &
                         act_frac1)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            q(4,k)=sum(n_aer1*act_frac1)
-        endif        
+            temp1=sum(n_aer1*act_frac1)
+!             temp1=50.e6_sp
+            q(4,k-1)=temp1
+            q(4,k)=temp1
+            q(4,k+1)=temp1
+            q(4,k+2)=temp1
+        endif      
         
-
+    
 
 
 
@@ -610,6 +625,7 @@
     q(3,1:kp)=q(3,1:kp)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
     			(pgacr+pgfr+psacr+piacr_g+piacr_s))*dt
     prevp=min(prevp,q(3,1:kp)/dt)
+    t(1:kp)=t(1:kp)+lv/cp*prevp*dt
     q(3,1:kp)=q(3,1:kp)-prevp*dt
     q(1,1:kp)=q(1,1:kp)+prevp*dt
     
@@ -626,7 +642,7 @@
     end where
 
     q=max(q,0._sp)	 
-    
+    if (theta_flag) theta=t*(1.e5_sp/p)**(ra/cp)
 
 
 
