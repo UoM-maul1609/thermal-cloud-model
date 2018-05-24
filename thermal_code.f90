@@ -97,14 +97,14 @@
 			! equation 42 of ZZRA:
 ! 			phi=zz*xx
 			! u and w winds
-				zc=zn(1)-z_offset
+				zc=zn(1) !-z_offset
 				test3=((z(j)-z_offset)-zc)
 				test1=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 				test1=-n_bar_mac/k*(z_bar+test3-k1*test3**2)/sqrt(test1) &
 						*sin(k*xn(i))
 									
-				zc=zn(1)-z_offset
+				zc=zn(1) !-z_offset
 				test3=((zn(j)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
@@ -118,7 +118,7 @@
 ! 				u(j,i)=u(j,i)-imag(test1)
 ! 				w(j,i)=w(j,i)-imag(test2)
 				! w on centred points
-				zc=zn(1)
+				zc=zn(1) !-z_offset
 				test3=((z(j)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
