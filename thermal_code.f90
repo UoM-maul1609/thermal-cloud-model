@@ -152,11 +152,7 @@
 		u(j,:)=u(1,:)
 		w(j,:)=w(1,:)
 	enddo
-	u=u*w_peak/maxval(w)
-	w=w*w_peak/maxval(w)
-	
 
-	
 	do j=1,kp+o_halo
 		if(zn(j) >= z_offset) exit
 
@@ -164,7 +160,11 @@
 		u(j,:)=0._sp
 	enddo
 
+	u=u*w_peak/maxval(w(1:kp,1:ip))
+	w=w*w_peak/maxval(w(1:kp,1:ip))
 	
+	
+
     end subroutine thermal_2d
 
 	!>@author
