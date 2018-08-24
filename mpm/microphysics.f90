@@ -500,7 +500,7 @@
         qold=q(2,k)
         qtot=q(1,k)+q(2,k)
         q(2,k)=q(1,k)+q(2,k)-smr(k)
-        if (theta_flag) q(2,k)=q(2,k)+(lv/cp*q(2,k))*dqs_dt / (1._sp+lv/cp*dqs_dt)
+        if (theta_flag) q(2,k)=q(2,k)+(lv/cp*qold)*dqs_dt / (1._sp+lv/cp*dqs_dt)
         q(2,k)=max(q(2,k),0._sp)
         t(k)=t(k)
         if(theta_flag) t(k)=t(k)+lv/cp*(q(2,k)-qold)
