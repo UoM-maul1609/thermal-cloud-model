@@ -625,7 +625,7 @@
     q(3,1:kp)=q(3,1:kp)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
     			(pgacr+pgfr+psacr+piacr_g+piacr_s))*dt
     prevp=min(prevp,q(3,1:kp)/dt)
-    t(1:kp)=t(1:kp)+lv/cp*prevp*dt
+    t(1:kp)=t(1:kp)-lv/cp*prevp*dt
     q(3,1:kp)=q(3,1:kp)-prevp*dt
     q(1,1:kp)=q(1,1:kp)+prevp*dt
     
