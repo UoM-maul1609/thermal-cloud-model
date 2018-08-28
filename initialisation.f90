@@ -162,15 +162,16 @@
 
 	q=0._sp
 	if (adiabatic_prof) then
+	    ! ++++ Dry adiabat
 		! calculate the dry adiabat:
-		theta_surf=tsurf*(1e5_sp/psurf)**(ra/cp)
+		theta_surf=tsurf*(1.e5_sp/psurf)**(ra/cp)
 		p1=psurf
 		z1=0._sp
 		p2=1.e5_sp*(t_cbase/theta_surf)**(cp/ra)
 		htry=p2-psurf
-		eps2=1e-5_sp
+		eps2=1.e-5_sp
 		call odeint(z1,p1,p2,eps2,htry,hmin,hydrostatic1,rkqs)
-		p1=p2
+		p1=p2 ! p1 is the cloud-base pressure, z1 is the cb height
 		
 		! integrate going downwards - dry adiabatic layer
 		p(1,:)=psurf
@@ -180,34 +181,41 @@
 			p11=p(i,1)
 			htry=-dz
 			hmin=-1.e-2_sp
+			! finds the pressure on different levels:
 			call odeint(p11,z11,z22,eps2,htry,hmin,hydrostatic1a,rkqs)
-			p(i-1,:)=p11(1)
+			p(i-1,:)=p11(1) 
 		enddo
 		! integrate going upwards - dry adiabatic layer
 		p(1,:)=psurf
 		do i=1,kp+o_halo-1
 			z11=z(i)
 			z22=z(i+1)
-			if(z22.gt.z1(1)) exit
+			if(z22.gt.z1(1)) exit ! gt cloud-base height
 			p11=p(i,1)
 			htry=dz
 			hmin=1.e-2_sp
+			! finds the pressure on different levels:
 			call odeint(p11,z11,z22,eps2,htry,hmin,hydrostatic1a,rkqs)
 			p(i+1,:)=p11(1)
 		enddo
 		istore=i-1
 		! adiabatic temperature
 		t(-o_halo+1:istore,:)=theta_surf*(p(-o_halo+1:istore,:)/1.e5_sp)**(ra/cp)
-		! adiabatic vapour mixing ratio
+		! adiabatic vapour mixing ratio - at all levels below CB:
 		q(1,-o_halo+1:istore,:)=eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase))
+        ! ---- Dry adiabat done
 
 
+
+
+        ! ++++ Moist adiabat
 		! now calculate the moist adiabat
 		w_cb=eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase))
 		theta_q_sat=t_cbase*(1.e5_sp/p1)**(ra/cp)*exp(lv*w_cb/cp/t_cbase)	
 		! theta_q_sat is conserved. Use it to calculate the new temperature
 		t1old=t_ctop
 
+        ! calculates the pressure at t1old, conserving theta_q_sat:
 		p_ctop=zbrent(calc_theta_q2,p1,3000._sp,1.e-5_sp)
 
 !		stop
@@ -219,8 +227,10 @@
 		t(istore,:)=theta_surf*( &
 			(p(istore,:)-dz*p(istore,:)/ra/t_ctop)/1.e5_sp)**(ra/cp) ! a temperature colder than
 		                                                   ! next level
-
-		t(istore,:)=zbrent(calc_theta_q,1.01*t(istore,1),t_ctop,1.e-5_sp)
+        
+        ! calculates the temperature at p111, conserving theta_q_sat
+        ! this is at cloud-base (i.e. istore)
+		t(istore,:)=zbrent(calc_theta_q,1.01_sp*t(istore,1),t_ctop,1.e-5_sp)
 
 		t1old=t(istore,1)
 		do i=istore,kp+o_halo-1
@@ -238,7 +248,7 @@
 			!print *,t1old,p11,z11,z22
 			call odeint(p11,z11,z22,eps2,htry,hmin,hydrostatic2a,rkqs)
 			p(i+1,:)=p11(1)
-			t(i+1,:)=theta_surf*(p(i+1,:)/1e5_sp)**(ra/cp)
+			t(i+1,:)=theta_surf*(p(i+1,:)/1.e5_sp)**(ra/cp)
 			t1old=t(i,1)
 			p111=p(i+1,1)
 			t(i+1,:)=zbrent(calc_theta_q,t(i+1,1),t1old*1.01_sp,1.e-5_sp)
