@@ -516,7 +516,7 @@
         qtot=q(1,k)+q(2,k)
 		
         q(2,k)=q(1,k)+q(2,k)-smr(k)
-        if (theta_flag) q(2,k)=q(2,k)+(lv/cp*qold)*dqs_dt / (1._sp+lv/cp*dqs_dt)
+        if (theta_flag) q(2,k)=(q(2,k)+(lv/cp*qold)*dqs_dt) / (1._sp+lv/cp*dqs_dt)
         q(2,k)=max(q(2,k),0._sp)
         t(k)=t(k)
         if(theta_flag) t(k)=t(k)+lv/cp*(q(2,k)-qold)
@@ -559,7 +559,7 @@
                         act_frac1)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             temp1=sum(n_aer1*act_frac1)
-            !temp1=10.e6_sp
+            temp1=10.e6_sp
             q(4,k-1)=temp1
             q(4,k)=temp1
             q(4,k+1)=temp1
