@@ -136,6 +136,7 @@
 	! calculate u via finite difference
 	wcen(0,:)=wcen(1,:)
 	u=0._sp
+	w=0._sp
 	
 	do i=1,ip
 		u(1:kp,i)=u(1:kp,i-1)-(wcen(1:kp,i)-wcen(0:kp-1,i))*dx/dz
@@ -163,6 +164,8 @@
 	u=u*w_peak/maxval(w(1:kp,1:ip))
 	w=w*w_peak/maxval(w(1:kp,1:ip))
 	
+	w(-o_halo+1:0,-o_halo+1:ip+o_halo)=0._sp
+	u(-o_halo+1:0,-o_halo+1:ip+o_halo)=0._sp
 	
 
     end subroutine thermal_2d
