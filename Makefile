@@ -23,12 +23,39 @@ FFLAGS = $(OPT)  $(DEBUG)  -o
 FFLAGSOMP = -fopenmp-simd $(FFLAGS)
 FFLAGS2 =  $(DEBUG) -O3 -o 
 
+all: main.exe main_ser_1d.exe main_ser_2d.exe
 
 main.exe	:  main.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) driver_code.$(OBJ) advection_3d.$(OBJ) \
+			 initialisation.$(OBJ) driver_code.$(OBJ) advection_1d.$(OBJ) \
+			 advection_2d.$(OBJ)  \
+			 advection_3d.$(OBJ) \
 			  model_lib.a  
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
-		 initialisation.$(OBJ) driver_code.$(OBJ) advection_3d.$(OBJ) \
+		 initialisation.$(OBJ) driver_code.$(OBJ) advection_1d.$(OBJ) \
+		 advection_2d.$(OBJ) \
+		 advection_3d.$(OBJ) \
+		  -lm model_lib.a \
+		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)	 
+main_ser_1d.exe	:  main_ser_1d.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
+			 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
+			 advection_2d.$(OBJ)  \
+			 advection_3d.$(OBJ) \
+			  model_lib.a  
+	$(FOR2) $(FFLAGSOMP)main_ser_1d.exe main_ser_1d.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
+		 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
+		 advection_2d.$(OBJ) \
+		 advection_3d.$(OBJ) \
+		  -lm model_lib.a \
+		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
+main_ser_2d.exe	:  main_ser_2d.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
+			 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
+			 advection_2d.$(OBJ)  \
+			 advection_3d.$(OBJ) \
+			  model_lib.a  
+	$(FOR2) $(FFLAGSOMP)main_ser_2d.exe main_ser_2d.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
+		 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
+		 advection_2d.$(OBJ) \
+		 advection_3d.$(OBJ) \
 		  -lm model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
@@ -63,15 +90,32 @@ variables.$(OBJ) : variables.f90 nrtype.$(OBJ)
 	$(FOR) variables.f90 $(FFLAGS)variables.$(OBJ)
 initialisation.$(OBJ) : initialisation.f90 random.$(OBJ) nr.$(OBJ) nrtype.$(OBJ)
 	$(FOR) initialisation.f90 -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ)
-driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) advection_3d.$(OBJ) 
+driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) advection_1d.$(OBJ) \
+advection_2d.$(OBJ) advection_3d.$(OBJ) 
 	$(FOR) driver_code.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ)
+driver_code_ser.$(OBJ) : driver_code_ser.f90 nrtype.$(OBJ) advection_1d.$(OBJ) \
+advection_2d.$(OBJ) advection_3d.$(OBJ) 
+	$(FOR) driver_code_ser.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code_ser.$(OBJ)
 mpi_module.$(OBJ) : mpi_module.f90 
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
+advection_1d.$(OBJ) : advection_1d.f90 
+	$(FOR) advection_1d.f90 -cpp $(FFLAGSOMP)advection_1d.$(OBJ)
+advection_2d.$(OBJ) : advection_2d.f90 
+	$(FOR) advection_2d.f90 -cpp $(FFLAGSOMP)advection_2d.$(OBJ)
 advection_3d.$(OBJ) : advection_3d.f90 
 	$(FOR) advection_3d.f90 $(FFLAGSOMP)advection_3d.$(OBJ)
 main.$(OBJ)   : main.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ) \
-				 driver_code.$(OBJ) advection_3d.$(OBJ) 
+				 driver_code.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
+				 advection_3d.$(OBJ) 
 	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) 
+main_ser_1d.$(OBJ)   : main_ser_1d.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ) \
+				 driver_code_ser.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
+				 advection_3d.$(OBJ) 
+	$(FOR)  main_ser_1d.f90 -I ${NETCDFMOD} $(FFLAGS)main_ser_1d.$(OBJ) 
+main_ser_2d.$(OBJ)   : main_ser_2d.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ) \
+				 driver_code_ser.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
+				 advection_3d.$(OBJ) 
+	$(FOR)  main_ser_2d.f90 -I ${NETCDFMOD} $(FFLAGS)main_ser_2d.$(OBJ) 
 
 clean :
 	rm *.exe  *.o *.mod *~ \

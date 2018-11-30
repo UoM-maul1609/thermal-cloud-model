@@ -31,6 +31,43 @@
 
 
 
+		!>@brief
+		!>main model prognostic variables
+        type grid_1d
+            ! variables for grid
+            integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
+                            nq=n_q
+            integer(i4b), dimension(3) :: coords
+            real(sp) :: f, re, g, dt
+            real(sp), dimension(:), allocatable :: u,v, w
+            real(sp), dimension(:,:), allocatable :: q
+            real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
+            										x, y, z, xn,yn,zn, &
+            										rhoa, rhoan,lamsq, lamsqn
+            										 
+        end type grid_1d
+
+
+
+    											
+		!>@brief
+		!>main model prognostic variables
+        type grid_2d
+            ! variables for grid
+            integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
+                            nq=n_q
+            integer(i4b), dimension(3) :: coords
+            real(sp) :: f, re, g, dt
+            real(sp), dimension(:,:), allocatable :: u,v, w
+            real(sp), dimension(:,:,:), allocatable :: q
+            real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
+            										x, y, z, xn,yn,zn, &
+            										rhoa, rhoan,lamsq, lamsqn
+            										 
+        end type grid_2d
+
+
+
     											
 				
 	
@@ -80,7 +117,11 @@
 		! declare a namelist type
 		type(namelist_input) :: nm1
         ! declare a grid type
-        type(grid) :: grid1
+        type(grid) :: grid3
+        ! declare a grid type
+        type(grid_1d) :: grid1
+        ! declare a grid type
+        type(grid_2d) :: grid2
         ! declare an io type
         type(io) :: io1
 

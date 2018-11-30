@@ -68,8 +68,8 @@
         read(8,nml=run_vars)
         close(8)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		grid1%l_halo=1 
-		grid1%r_halo=1 
+		grid3%l_halo=1 
+		grid3%r_halo=1 
 
 
 
@@ -100,22 +100,22 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Allocate and initialise arrays									   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		call allocate_and_set(  nm1%dt,nm1%runtime,grid1%ntim, &
-			grid1%x, grid1%y, grid1%z, &
-			grid1%xn, grid1%yn, grid1%zn, &
-			grid1%u,grid1%v,grid1%w,&
-			grid1%q, &
-			grid1%rhoa,grid1%rhoan, &
-			grid1%lamsq,grid1%lamsqn, &
+		call allocate_and_set(  nm1%dt,nm1%runtime,grid3%ntim, &
+			grid3%x, grid3%y, grid3%z, &
+			grid3%xn, grid3%yn, grid3%zn, &
+			grid3%u,grid3%v,grid3%w,&
+			grid3%q, &
+			grid3%rhoa,grid3%rhoan, &
+			grid3%lamsq,grid3%lamsqn, &
 			nm1%cvis, &
-			grid1%dx, grid1%dy, grid1%dz, &
-			grid1%dxn, grid1%dyn, grid1%dzn, &
-			grid1%ip, grid1%jp, grid1%kp, grid1%nq, &
-			grid1%ipstart, grid1%jpstart, grid1%kpstart, &
+			grid3%dx, grid3%dy, grid3%dz, &
+			grid3%dxn, grid3%dyn, grid3%dzn, &
+			grid3%ip, grid3%jp, grid3%kp, grid3%nq, &
+			grid3%ipstart, grid3%jpstart, grid3%kpstart, &
 			nm1%dx, nm1%dy, nm1%dz, &
 			nm1%ip, nm1%jp, nm1%kp, n_q,& 
-			grid1%l_halo,grid1%r_halo, &
-			grid1%coords,mp1%dims, mp1%id, mp1%ring_comm)
+			grid3%l_halo,grid3%r_halo, &
+			grid3%coords,mp1%dims, mp1%id, mp1%ring_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -136,19 +136,19 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Driver code: time-loop, advance solution, output	   				   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- 		call model_driver(grid1%ntim,nm1%dt,grid1%nq, &
- 		        grid1%l_halo,grid1%r_halo, &
+ 		call model_driver(grid3%ntim,nm1%dt,grid3%nq, &
+ 		        grid3%l_halo,grid3%r_halo, &
 				nm1%ip, nm1%jp, nm1%kp, &
-				grid1%ip, grid1%jp, grid1%kp, &
-				grid1%ipstart, grid1%jpstart, grid1%kpstart, &
-				grid1%x, grid1%y, grid1%z, &
-				grid1%dx, grid1%dy, grid1%dz, &
-				grid1%dxn, grid1%dyn, grid1%dzn, &
-				grid1%u,grid1%v,grid1%w,&
-				grid1%q,&
-				grid1%rhoa,grid1%rhoan, &
-				grid1%lamsq,grid1%lamsqn, &
-				grid1%coords, &
+				grid3%ip, grid3%jp, grid3%kp, &
+				grid3%ipstart, grid3%jpstart, grid3%kpstart, &
+				grid3%x, grid3%y, grid3%z, &
+				grid3%dx, grid3%dy, grid3%dz, &
+				grid3%dxn, grid3%dyn, grid3%dzn, &
+				grid3%u,grid3%v,grid3%w,&
+				grid3%q,&
+				grid3%rhoa,grid3%rhoan, &
+				grid3%lamsq,grid3%lamsqn, &
+				grid3%coords, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
 				nm1%viscous_dissipation, &
 				nm1%advection_scheme, nm1%kord, nm1%monotone, &
