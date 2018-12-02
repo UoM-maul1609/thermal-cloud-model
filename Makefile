@@ -26,44 +26,34 @@ FFLAGS2 =  $(DEBUG) -O3 -o
 all: main.exe main_ser_1d.exe main_ser_2d.exe
 
 main.exe	:  main.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) driver_code.$(OBJ) advection_1d.$(OBJ) \
-			 advection_2d.$(OBJ)  \
-			 advection_3d.$(OBJ) \
+			 initialisation.$(OBJ) driver_code.$(OBJ) \
 			  model_lib.a  
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
-		 initialisation.$(OBJ) driver_code.$(OBJ) advection_1d.$(OBJ) \
-		 advection_2d.$(OBJ) \
-		 advection_3d.$(OBJ) \
+		 initialisation.$(OBJ) driver_code.$(OBJ) \
 		  -lm model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)	 
 main_ser_1d.exe	:  main_ser_1d.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
-			 advection_2d.$(OBJ)  \
-			 advection_3d.$(OBJ) \
+			 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 			  model_lib.a  
 	$(FOR2) $(FFLAGSOMP)main_ser_1d.exe main_ser_1d.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
-		 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
-		 advection_2d.$(OBJ) \
-		 advection_3d.$(OBJ) \
+		 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 		  -lm model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 main_ser_2d.exe	:  main_ser_2d.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
-			 advection_2d.$(OBJ)  \
-			 advection_3d.$(OBJ) \
+			 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 			  model_lib.a  
 	$(FOR2) $(FFLAGSOMP)main_ser_2d.exe main_ser_2d.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
-		 initialisation.$(OBJ) driver_code_ser.$(OBJ) advection_1d.$(OBJ) \
-		 advection_2d.$(OBJ) \
-		 advection_3d.$(OBJ) \
+		 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 		  -lm model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				hygfx.$(OBJ)  random.$(OBJ)
+				hygfx.$(OBJ)  random.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
+				advection_3d.$(OBJ)
 	$(AR) rc model_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				hygfx.$(OBJ)  random.$(OBJ)
+				hygfx.$(OBJ)  random.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
+				advection_3d.$(OBJ)
 locate.$(OBJ)	: locate.f90
 	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
 polint.$(OBJ)	: polint.f90

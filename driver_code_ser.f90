@@ -41,7 +41,7 @@
 				viscous, &
 				advection_scheme, kord, monotone)
 		use nrtype
-		use advection_2d, only : first_order_upstream_2d, mpdata_2d, &
+		use advection_s_2d, only : first_order_upstream_2d, mpdata_2d, &
 		                    mpdata_vec_2d
 
 		implicit none
@@ -236,7 +236,7 @@
 				viscous, &
 				advection_scheme, kord, monotone)
 		use nrtype
-		use advection_1d, only : first_order_upstream_1d, mpdata_1d, &
+		use advection_s_1d, only : first_order_upstream_1d, mpdata_1d, &
 		                    mpdata_vec_1d
 
 		implicit none

@@ -2,7 +2,7 @@
 	!>Paul Connolly, The University of Manchester
 	!>@brief
 	!>advection code 
-    module advection_2d
+    module advection_s_2d
     use nrtype
     
     private
@@ -955,4 +955,4 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-    end module advection_2d
+    end module advection_s_2d

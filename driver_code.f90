@@ -46,7 +46,7 @@
 				dims,id, world_process, rank, ring_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
-		use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state, &
+		use advection_s_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state, &
 		                    mpdata_vec_3d
 
 		implicit none

@@ -2,7 +2,7 @@
 	!>Paul Connolly, The University of Manchester
 	!>@brief
 	!>advection code for the dynamical cloud model
-    module advection_3d
+    module advection_s_3d
     use nrtype
     
     private
@@ -1124,4 +1124,4 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-    end module advection_3d
+    end module advection_s_3d
