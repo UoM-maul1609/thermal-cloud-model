@@ -271,8 +271,8 @@
     ! arguments:
     integer(i4b), intent(in) :: nq, ip,kp, o_halo
     real(sp), intent(in) :: dt,dz
-    real(sp), dimension(nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: q
-    real(sp), dimension(1,1:kp,1:ip), intent(inout) :: precip
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
+    real(sp), dimension(1:kp,1:ip,1), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
     					theta, p, t, rho
     real(sp), dimension(-o_halo+1:kp+o_halo) :: z
@@ -285,7 +285,7 @@
 	integer(i4b) :: i
 	
 	do i=1,ip
-		call w_microphysics_1d(nq,kp,o_halo,dt,dz,q(:,:,i),precip(:,:,i),theta(:,i),p(:,i), &
+		call w_microphysics_1d(nq,kp,o_halo,dt,dz,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),t(:,i),rho(:,i),w(:,i), &
     						micro_init,hm_flag, mass_ice, theta_flag)
 	enddo
@@ -323,8 +323,8 @@
     ! arguments:
     integer(i4b), intent(in) :: nq, kp, o_halo
     real(sp), intent(in) :: dt,dz
-    real(sp), dimension(nq,-o_halo+1:kp+o_halo), intent(inout) :: q
-    real(sp), dimension(1,1:kp), intent(inout) :: precip
+    real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
+    real(sp), dimension(1:kp,1), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: theta, p, z, t, rho
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, theta_flag
@@ -461,15 +461,15 @@
     rho=p / (ra*t) ! air density    
     rho_fac=(rho0/rho(1:kp))**0.5_sp
     ! rain n0, lambda
-    lam_r=(max(q(5,1:kp),1._sp)*cr*gam2r / (max(q(3,1:kp),1.e-10_sp)*gam1r))**(1._sp/dr)
-    n_r=rho(1:kp)*max(q(5,1:kp),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
+    lam_r=(max(q(1:kp,5),1._sp)*cr*gam2r / (max(q(1:kp,3),1.e-10_sp)*gam1r))**(1._sp/dr)
+    n_r=rho(1:kp)*max(q(1:kp,5),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
     ! cloud n0, lambda    
-    lam_c=(max(q(4,1:kp),1._sp)*cc*gam2c / (max(q(2,1:kp),1.e-10_sp)*gam1c))**(1._sp/1._sp)
-    n_c=rho(1:kp)*max(q(4,1:kp),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
+    lam_c=(max(q(1:kp,4),1._sp)*cc*gam2c / (max(q(1:kp,2),1.e-10_sp)*gam1c))**(1._sp/1._sp)
+    n_c=rho(1:kp)*max(q(1:kp,4),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
 
     
     ! precipitation
-	precip(1,1:kp)=cr*n_r*(a_r*chi_rain/(lam_r**(alpha_r+b_r+dr+1._sp)) - &
+	precip(1:kp,1)=cr*n_r*(a_r*chi_rain/(lam_r**(alpha_r+b_r+dr+1._sp)) - &
 					u(1:kp)*chi_rain1/(lam_r**(alpha_r+dr+1._sp))) &
 					/rho(1:kp) *3600._sp
     
@@ -512,22 +512,22 @@
 
         des_dt=dfridr(svp_liq,t(k),1.e0_sp,err)
         dqs_dt=eps1*p(k)*des_dt/(p(k)-svp_liq(t(k)))**2
-        qold=q(2,k)
-        qtot=q(1,k)+q(2,k)
+        qold=q(k,2)
+        qtot=q(k,1)+q(k,2)
 		
-        q(2,k)=q(1,k)+q(2,k)-smr(k)
-        if (theta_flag) q(2,k)=(q(2,k)+(lv/cp*qold)*dqs_dt) / (1._sp+lv/cp*dqs_dt)
-        q(2,k)=max(q(2,k),0._sp)
+        q(k,2)=q(k,1)+q(k,2)-smr(k)
+        if (theta_flag) q(k,2)=(q(k,2)+(lv/cp*qold)*dqs_dt) / (1._sp+lv/cp*dqs_dt)
+        q(k,2)=max(q(k,2),0._sp)
         t(k)=t(k)
-        if(theta_flag) t(k)=t(k)+lv/cp*(q(2,k)-qold)
+        if(theta_flag) t(k)=t(k)+lv/cp*(q(k,2)-qold)
 		
 		tc=t(k)-ttr
     	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
     	q0sat=smr(k)	
     	smr_i(k)=eps1*svp_ice(t(k))/(p(k)-svp_ice(t(k))) ! saturation mixing ratio - ice	
     	
-    	cond=(q(2,k)-qold)
-    	q(1,k)=q(1,k)-cond
+    	cond=(q(k,2)-qold)
+    	q(k,1)=q(k,1)-cond
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         ! inhomogeneous mixing -https://journals.ametsoc.org/doi/pdf/10.1175/2007JAS2374.1
@@ -540,7 +540,7 @@
 
 
         k1=max(k-1,1)
-	    if((q(2,k) .gt. qsmall) .and. (q(2,k1) .lt. qsmall)) then
+	    if((q(k,2) .gt. qsmall) .and. (q(k1,2) .lt. qsmall)) then
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Bulk Aerosol Activation - number of drops
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -560,10 +560,10 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             temp1=sum(n_aer1*act_frac1)
             !temp1=10.e6_sp
-            q(4,k-1)=temp1
-            q(4,k)=temp1
-            q(4,k+1)=temp1
-            q(4,k+2)=temp1
+            q(k-1,4)=temp1
+            q(k,4)=temp1
+            q(k+1,4)=temp1
+            q(k+2,4)=temp1
         endif      
         
     
@@ -587,8 +587,8 @@
 				(lam_r(k)+0.5_sp*f_r)**(0.5_sp*b_r+alpha_r+2.5_sp))
 
 	
-		rain_evap=(q(1,k)/smr(k)-1._sp) / (rho(k)*ab_liq)*nu_rain
-		if(q(1,k).gt.smr(k)) then
+		rain_evap=(q(k,1)/smr(k)-1._sp) / (rho(k)*ab_liq)*nu_rain
+		if(q(k,1).gt.smr(k)) then
 			prevp(k)=0._sp
 		else
 			prevp(k)=-min(rain_evap,0._sp)
@@ -601,7 +601,7 @@
 		! warm rain autoconversion based on Seifert and Beheng (2006)                    !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		call seifert_beheng(sb_aut,sb_acr, sb_cwaut, sb_cwacr, sb_raut, &
-		                    sb_rsel, sb_cwsel, q(2,k),q(4,k),q(3,k),q(5,k),rho(k),dt)
+		                    sb_rsel, sb_cwsel, q(k,2),q(k,4),q(k,3),q(k,5),rho(k),dt)
 		praut(k)=sb_aut
 		pracw(k)=sb_acr
 		rcwaut(k)=sb_cwaut
@@ -618,27 +618,27 @@
     
     ! update variables
     ! vapour mass
-    q(1,1:kp)=q(1,1:kp)+(pgsub+pssub+pisub-(psdep+pidep+piprm+pgdep))*dt
+    q(1:kp,1)=q(1:kp,1)+(pgsub+pssub+pisub-(psdep+pidep+piprm+pgdep))*dt
     ! liquid mass
-    q(2,1:kp)=q(2,1:kp)-((pgacw+praut+psacw+pracw+piacw+pihal+picnt+pifrw))*dt
+    q(1:kp,2)=q(1:kp,2)-((pgacw+praut+psacw+pracw+piacw+pihal+picnt+pifrw))*dt
     ! rain mass
-    q(3,1:kp)=q(3,1:kp)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
+    q(1:kp,3)=q(1:kp,3)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
     			(pgacr+pgfr+psacr+piacr_g+piacr_s))*dt
-    prevp=min(prevp,q(3,1:kp)/dt)
+    prevp=min(prevp,q(1:kp,3)/dt)
     t(1:kp)=t(1:kp)-lv/cp*prevp*dt
-    q(3,1:kp)=q(3,1:kp)-prevp*dt
-    q(1,1:kp)=q(1,1:kp)+prevp*dt
+    q(1:kp,3)=q(1:kp,3)-prevp*dt
+    q(1:kp,1)=q(1:kp,1)+prevp*dt
     
     ! liquid number
-    q(4,1:kp)=q(4,1:kp)+(rcwaut+rcwacr+rcwsel)*dt
+    q(1:kp,4)=q(1:kp,4)+(rcwaut+rcwacr+rcwsel)*dt
     ! rain number
-    q(5,1:kp)=q(5,1:kp)+(rraut+rrsel-prevp*(q(5,1:kp)/(q(3,1:kp)+qsmall)))*dt
+    q(1:kp,5)=q(1:kp,5)+(rraut+rrsel-prevp*(q(1:kp,5)/(q(1:kp,3)+qsmall)))*dt
     
-    where(q(2,:) .lt. qsmall)
-        q(4,:) = 0.0_sp
+    where(q(:,2) .lt. qsmall)
+        q(:,4) = 0.0_sp
     end where
-    where(q(3,:) .lt. qsmall)
-        q(5,:) = 0.0_sp
+    where(q(:,3) .lt. qsmall)
+        q(:,5) = 0.0_sp
     end where
 
     q=max(q,0._sp)	 
@@ -651,7 +651,7 @@
 	! advection rain 0th order Bott, a.k.a. upstream advection                           !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! rain 
-    if(sum(q(3,1:kp)).gt.qsmall) then
+    if(sum(q(1:kp,3)).gt.qsmall) then
 		where(isnan(vqr))
 			vqr=0_sp
 		end where
@@ -660,7 +660,7 @@
 		n_step=max(ceiling(maxval(vqr)*dt/dz*2_sp),1)
 		vqr(-o_halo:kp+o_halo-1)=-vqr(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqr,q(3,:),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqr,q(:,3),.false.)
 		enddo
 		where(isnan(vnr))
 			vnr=0_sp
@@ -670,11 +670,11 @@
 		n_step=max(ceiling(maxval(vnr)*dt/dz*2_sp),1)
 		vnr(-o_halo:kp+o_halo-1)=-vnr(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vnr,q(5,:),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vnr,q(:,5),.false.)
 		enddo
 	endif
     ! cloud 
-    if(sum(q(2,1:kp)).gt.qsmall) then
+    if(sum(q(1:kp,2)).gt.qsmall) then
 		where(isnan(vqc))
 			vqc=0_sp
 		end where
@@ -683,7 +683,7 @@
 		n_step=max(ceiling(maxval(vqc)*dt/dz*2_sp),1)
 		vqc(-o_halo:kp+o_halo-1)=-vqc(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqc,q(2,:),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqc,q(:,2),.false.)
 		enddo
 		where(isnan(vnc))
 			vnc=0_sp
@@ -693,7 +693,7 @@
 		n_step=max(ceiling(maxval(vnc)*dt/dz*2_sp),1)
 		vnc(-o_halo:kp+o_halo-1)=-vnc(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vnc,q(4,:),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vnc,q(:,4),.false.)
 		enddo
 	endif
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
