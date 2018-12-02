@@ -67,6 +67,8 @@
 	!>@param[in] o_halo number of extra grid levels required for advection
 	!>@param[in] dx horizontal resolution of grid
 	!>@param[in] dz vertical resolution of grid
+	!>@param[in] dx2 horizontal resolution of grid
+	!>@param[in] dz2 vertical resolution of grid
 	!>@param[inout] q, qold, precip, theta, th_old, 
 	!>             pressure, x,xn,z,zn, temperature, rho,u,w, delsq, vis
 	!>@param[in] drop_num_init: flag to initialise number of drops where liquid water>0
@@ -79,7 +81,7 @@
     subroutine calc_profile_2d(nq,nprec,n_levels,psurf,tsurf,t_cbase, &
     						t_ctop, adiabatic_prof, adiabatic_frac,q_type,q_init, &
                              z_read,theta_read,q_read, &
-                             ip,kp,o_halo,dx,dz,q,qold, &
+                             ip,kp,o_halo,dx,dz,dx2,dz2,q,qold, &
                              precip,theta,th_old, p,x,xn,z,zn,t,rho,u,w,&
                              delsq, vis, &
                              drop_num_init, num_drop, &
@@ -107,7 +109,7 @@
     real(sp), dimension(:,:), allocatable, intent(inout) :: theta, th_old, &
                                                      p, t, rho,u, w,delsq, &
                                                             vis
-    real(sp), dimension(:), allocatable, intent(inout) :: x, z,xn,zn
+    real(sp), dimension(:), allocatable, intent(inout) :: x, z,xn,zn, dx2, dz2
     real(sp), dimension(:,:,:), allocatable, intent(inout) :: q, qold, precip
     ! local variables:
     integer(i4b) :: i,j, iloc, AllocateStatus, istore,istore2
@@ -117,11 +119,11 @@
 	real(sp) :: htry,hmin,eps2,p1,p2,p_ctop,z11,z22,theta1
 
     ! allocate arrays
-    allocate( precip(1:nprec,1:kp,1:ip), STAT = AllocateStatus)
+    allocate( precip(1:kp,1:ip,1:nprec), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
-    allocate( q(1:nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
+    allocate( q(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,1:nq), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
-    allocate( qold(1:nq,-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
+    allocate( qold(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,1:nq), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( theta(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -132,6 +134,10 @@
     allocate( x(-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( z(-o_halo+1:kp+o_halo), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( dx2(-o_halo+1:ip+o_halo), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( dz2(-o_halo+1:kp+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( xn(-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -159,7 +165,9 @@
     x=dx*(/(i,i=-o_halo,ip+o_halo-1)/)!-0.5_sp*dx
     x=x+0.5_sp*dx
     xn=x+0.5_sp*dx
-
+    dx2=dx
+    dz2=dz
+    
 	q=0._sp
 	if (adiabatic_prof) then
 	    ! ++++ Dry adiabat
@@ -202,7 +210,7 @@
 		! adiabatic temperature
 		t(-o_halo+1:istore,:)=theta_surf*(p(-o_halo+1:istore,:)/1.e5_sp)**(ra/cp)
 		! adiabatic vapour mixing ratio - at all levels below CB:
-		q(1,-o_halo+1:istore,:)=eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase))
+		q(-o_halo+1:istore,:,1)=eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase))
         ! ---- Dry adiabat done
 
 
@@ -256,12 +264,12 @@
 		enddo
 		istore2=i-1
 		do i=istore,istore2
-			q(1,i,:)=eps1*svp_liq(t(i,1))/ &
+			q(i,:,1)=eps1*svp_liq(t(i,1))/ &
 								(p(i,1)-svp_liq(t(i,1)))
-			q(2,i,:)=adiabatic_frac* &
+			q(i,:,2)=adiabatic_frac* &
 					max(eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase)) - q(1,i,1),0._sp)
 			if(drop_num_init .and. (microphysics_flag .eq. 2)) then
-			    q(4,i,:) = num_drop
+			    q(i,:,4) = num_drop
 			endif
 		enddo
 
@@ -299,7 +307,7 @@
                 p111=p(i+1,1)
                 t(i+1,:)=zbrent(calc_theta_q,t(i+1,1),t1old*1.01_sp,1.e-5_sp)
             
-                q(1,i,:)=0.95_sp*eps1*svp_liq(t(i,1))/ &
+                q(i,:,1)=0.95_sp*eps1*svp_liq(t(i,1))/ &
                                     (p(i,1)-svp_liq(t(i,1)))
             enddo
         case default
@@ -314,8 +322,8 @@
 		! initialise ice crystals
 		if(ice_init .and. (microphysics_flag .eq. 1)) then
             where(t(istore:istore2,:).lt.ttr)
-                q(6,istore:istore2,:)=num_ice*mass_ice
-                q(7,istore:istore2,:)=num_ice
+                q(istore:istore2,:,6)=num_ice*mass_ice
+                q(istore:istore2,:,7)=num_ice
             end where
         endif
 	else
@@ -336,12 +344,12 @@
 					! linear interp q fields
 					call polint(z_read(iloc:iloc+1), q_read(j,iloc:iloc+1), &
 								min(z(i),z_read(n_levels)), var, dummy)
-					q(j,i,:)=var
+					q(i,:,j)=var
 				else
 					if(q_type(j).eq.2) then
-						q(j,i,:) = .0_sp
+						q(i,:,j) = .0_sp
 					else
-						q(j,i,:) = 0.0_sp
+						q(i,:,j) = 0.0_sp
 					endif
 				endif
 			enddo

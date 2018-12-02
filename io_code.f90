@@ -27,8 +27,8 @@
     implicit none
     real(sp), intent(in) :: time
     integer(i4b), intent(in) :: nq,nprec,kp,ip
-    real(sp), dimension(nq,kp,ip), intent(in) :: q
-    real(sp), dimension(nprec,kp,ip), intent(in) :: precip
+    real(sp), dimension(kp,ip,nq), intent(in) :: q
+    real(sp), dimension(kp,ip,nprec), intent(in) :: precip
     real(sp), dimension(kp,ip), intent(in) :: theta, p, t, u, w
     real(sp), dimension(ip), intent(in) :: x,xn
     real(sp), dimension(kp), intent(in) :: z,zn
@@ -75,6 +75,8 @@
         ! define variable: q
         call check( nf90_def_var(io1%ncid, "q", NF90_DOUBLE, &
             (/io1%nq_dimid, io1%k_dimid, io1%i_dimid, io1%x_dimid/), io1%varid) )
+!        call check( nf90_def_var(io1%ncid, "q", NF90_DOUBLE, &
+!            (/io1%k_dimid, io1%i_dimid,io1%nq_dimid,  io1%x_dimid/), io1%varid) )
         ! get id to a_dimid
         call check( nf90_inq_varid(io1%ncid, "q", io1%a_dimid) )
         ! units
@@ -209,37 +211,38 @@
     call check( nf90_put_var(io1%ncid, io1%varid, time, &
                 start = (/io1%icur/)))
 ! 
+
     ! write variable: q
     call check( nf90_inq_varid(io1%ncid, "q", io1%varid ) )
-    call check( nf90_put_var(io1%ncid, io1%varid, q, &
+    ! had to reshape twice
+    call check( nf90_put_var(io1%ncid, io1%varid, &
+        reshape(reshape(q,[nq,ip,kp],order=[3,2,1]),[nq,kp,ip],order=[1,3,2] ), &
                 start = (/1,1,1,io1%icur/)))
+!    call check( nf90_put_var(io1%ncid, io1%varid, q, &
+!                start = (/1,1,1,io1%icur/)))
 
     ! write variable: precip
     call check( nf90_inq_varid(io1%ncid, "precip", io1%varid ) )
-    call check( nf90_put_var(io1%ncid, io1%varid, precip, &
+    call check( nf90_put_var(io1%ncid, io1%varid, &
+        reshape(reshape(precip,[nprec,ip,kp],order=[3,2,1]),[nprec,kp,ip],order=[1,3,2] ), &
                 start = (/1,1,1,io1%icur/)))
+!    call check( nf90_put_var(io1%ncid, io1%varid, precip, &
+!                start = (/1,1,1,io1%icur/)))
 
     ! write variable: theta
     call check( nf90_inq_varid(io1%ncid, "theta", io1%varid ) )
     call check( nf90_put_var(io1%ncid, io1%varid, theta, &
                 start = (/1,1,io1%icur/)))
-! 
-!     ! write variable: p
-!     call check( nf90_inq_varid(io1%ncid, "p", io1%varid ) )
-!     call check( nf90_put_var(io1%ncid, io1%varid, p, &
-!                 start = (/1,io1%icur/)))
-! 
-! 
-!     ! write variable: t
-!     call check( nf90_inq_varid(io1%ncid, "t", io1%varid ) )
-!     call check( nf90_put_var(io1%ncid, io1%varid, t, &
-!                 start = (/1,io1%icur/)))
-! 
+
+    ! write variable: p
+    call check( nf90_inq_varid(io1%ncid, "p", io1%varid ) )
+    call check( nf90_put_var(io1%ncid, io1%varid, p, &
+                start = (/1,1,io1%icur/)))
+
     ! write variable: u
     call check( nf90_inq_varid(io1%ncid, "u", io1%varid ) )
     call check( nf90_put_var(io1%ncid, io1%varid, u, &
                 start = (/1,1,io1%icur/)))
-
 
     ! write variable: w
     call check( nf90_inq_varid(io1%ncid, "w", io1%varid ) )

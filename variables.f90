@@ -20,7 +20,7 @@
             real(sp), dimension(:,:,:), allocatable :: q, qold, precip
             real(sp), dimension(:,:), allocatable :: theta, th_old, &
                 p, rho, t, u, w,delsq, vis
-            real(sp), dimension(:), allocatable :: x,z,xn,zn
+            real(sp), dimension(:), allocatable :: x,z,xn,zn, dx2, dz2
         end type grid
 
 		!>@brief

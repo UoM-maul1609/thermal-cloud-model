@@ -1,10 +1,13 @@
 MPM_DIR = mpm
 WMM_DIR = wmm
 BAM_DIR = wmm/bam
+SFVT_DIR = sfvt
 
 .PHONY: mpm_code cleanall
 .PHONY: wmm_code cleanall
-CLEANDIRS = $(MPM_DIR) $(WMM_DIR) $(WMM_DIR)/bam ./
+.PHONY: sfvt_code cleanall
+CLEANDIRS = $(MPM_DIR) $(WMM_DIR) $(WMM_DIR)/bam $(SFVT_DIR) ./
+
 
 DEBUG = -fbounds-check -g
 MPI    =#-DMPI1
@@ -34,10 +37,11 @@ FFLAGS2 =  $(DEBUG) -O3 -o
 
 main.exe	:  model_lib.a  main.$(OBJ) variables.$(OBJ) initialisation.$(OBJ) \
 			 driver_code.$(OBJ) thermal_code.$(OBJ) io_code.$(OBJ) advection_2d.$(OBJ) \
-			 advection_1d.$(OBJ) mpm_code wmm_code
+			 advection_1d.$(OBJ) mpm_code wmm_code sfvt_code
 	$(FOR2) $(FFLAGS2)main.exe main.$(OBJ) variables.$(OBJ) initialisation.$(OBJ) \
 	     driver_code.$(OBJ) thermal_code.$(OBJ) io_code.$(OBJ) advection_2d.$(OBJ) \
 	     		 $(MPM_DIR)/micro_lib.a $(WMM_DIR)/wmicro_lib.a $(BAM_DIR)/bam_lib.a \
+	     		  $(SFVT_DIR)/model_lib.a \
 	     		 -lm model_lib.a \
 		${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
@@ -69,8 +73,8 @@ variables.$(OBJ) : variables.f90
 initialisation.$(OBJ) : initialisation.f90 mpm_code
 	$(FOR) initialisation.f90 $(FFLAGS)initialisation.$(OBJ) -I$(MPM_DIR)
 driver_code.$(OBJ) : driver_code.f90 thermal_code.$(OBJ) io_code.$(OBJ) \
-		advection_2d.$(OBJ) advection_1d.$(OBJ) mpm_code wmm_code
-	$(FOR) driver_code.f90 $(FFLAGS)driver_code.$(OBJ) -I$(MPM_DIR) -I$(WMM_DIR)
+		advection_2d.$(OBJ) advection_1d.$(OBJ) mpm_code wmm_code sfvt_code
+	$(FOR) driver_code.f90 $(FFLAGS)driver_code.$(OBJ) -I$(MPM_DIR) -I$(WMM_DIR) -I$(SFVT_DIR)
 thermal_code.$(OBJ) : thermal_code.f90 
 	$(FOR) thermal_code.f90 $(FFLAGS)thermal_code.$(OBJ)
 io_code.$(OBJ) : io_code.f90 
@@ -92,6 +96,9 @@ mpm_code:
 
 wmm_code:
 	$(MAKE) -C $(WMM_DIR)
+
+sfvt_code:
+	$(MAKE) -C $(SFVT_DIR)
 
 clean: 
 	rm *.exe  *.o *.mod *~ \

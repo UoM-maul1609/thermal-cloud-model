@@ -84,7 +84,8 @@
         call calc_profile_2d(nq,nprec,n_levels_s,psurf,tsurf,t_cbase,t_ctop, &
         					adiabatic_prof, adiabatic_frac, &
         					q_type,q_init, z_read,theta_read, &
-                            q_read,ip,kp,o_halo,dx,dz,grid1%q, grid1%qold, &
+                            q_read,ip,kp,o_halo,dx,dz,grid1%dx2,grid1%dz2, &
+                            grid1%q, grid1%qold, &
                             grid1%precip, &
                             grid1%theta, grid1%th_old, grid1%p,grid1%x,grid1%xn, &
                             grid1%z,grid1%zn,grid1%t,grid1%rho,grid1%u,grid1%w, &
@@ -102,7 +103,8 @@
         call model_driver_2d(nq,nprec,ip,kp,ord,o_halo,runtime,dt, cvis, &
         					grid1%q,grid1%qold, &
         					grid1%precip,grid1%theta, grid1%th_old, &
-                            grid1%p,dx,dz,grid1%x,grid1%xn,grid1%z,grid1%zn,&
+                            grid1%p,dx,dz,grid1%dx2,grid1%dz2,&
+                            grid1%x,grid1%xn,grid1%z,grid1%zn,&
 							grid1%t,grid1%rho,grid1%u,grid1%w,grid1%delsq,grid1%vis, &
 							io1%new_file, &
                             micro_init,advection_scheme, &
