@@ -16,12 +16,12 @@
     use bam, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
         	n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, nu_core1, org_content1, &
         	molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, p_test, t_test, &
-    		w_test, act_frac1, &
+    		w_test, act_frac1, smax1, dcrit2,  &
     		a_eq_7, b_eq_7, &
-    		ctmm_activation, initialise_arrays
+    		ctmm_activation, initialise_arrays, read_in_bam_namelist
     
     private
-    public :: w_microphysics_2d, w_microphysics_1d
+    public :: w_microphysics_2d, w_microphysics_1d, read_in_wmm_bam_namelist
     
     ! physical constants
     real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
@@ -89,7 +89,70 @@
 	
 	
     contains
+
+
     
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>read in the data from the namelists for the BAM module
+	!> and set variables for microphysics
+	!>@param[in] nmlfile
+	!>@param[inout] q_name, q_type, c_s, c_e
+	!>@param[inout] nq,ncat, nprec, iqv, iqc, inc
+	subroutine read_in_wmm_bam_namelist(nmlfile, &
+                q_name,q_type,c_s,c_e,nq,ncat,nprec, &
+                iqv, iqc, inc)
+		use bam, only : read_in_bam_namelist, n_mode
+		implicit none
+        character (len=200), intent(in) :: nmlfile
+        integer(i4b), intent(inout) :: nq, ncat,nprec, iqv, iqc, inc
+        integer(i4b), intent(inout), dimension(:), allocatable :: q_type, c_s, c_e
+        character(len=20), dimension(:), allocatable :: q_name
+        
+        integer(i4b) :: i
+        
+        call read_in_bam_namelist(nmlfile)
+        
+        ncat=5
+        
+        
+        nq=5 ! vapour, cloud mass, rain mass, cloud water, rain water
+        
+        allocate(q_name(nq))
+        allocate(q_type(ncat))
+        allocate(c_s(ncat))
+        allocate(c_e(ncat))
+        
+        q_type(1)=0 ! vapour
+        c_s(1)=1
+        c_e(1)=1
+        q_type(2)=1 ! cloud water
+        c_s(2)=2
+        c_e(2)=2
+        q_type(3)=1 ! rain water
+        c_s(3)=3
+        c_e(3)=3
+        q_type(4)=2 ! cloud water number
+        c_s(4)=4
+        c_e(4)=4
+        q_type(5)=2 ! rain water number
+        c_s(5)=5
+        c_e(5)=5
+        
+        q_name=["qv","qc","qr","nc","nr"]
+        
+        nprec=1
+        
+        iqv=1
+        iqc=2
+        inc=4
+        
+	end subroutine read_in_wmm_bam_namelist
+
+
+
+
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -556,7 +619,7 @@
                         org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
                         log_c_star1, &
                         w_test, t_test,p_test, a_eq_7, b_eq_7, &
-                        act_frac1)
+                        act_frac1,smax1,dcrit2)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             temp1=sum(n_aer1*act_frac1)
             !temp1=10.e6_sp
