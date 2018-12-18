@@ -1099,7 +1099,7 @@
             call mpdata_vec_1d(dt/real(n_step,sp),dz,dz,&
                             rho,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
                             vqr(-o_halo+1:kp+o_halo),&
-                            q(:,cst(cat_r):cen(cat_r)),0,.false.)		
+                            q(:,cst(cat_r):cen(cat_r)),1,.false.)		
         enddo
 	endif
     ! cloud 
@@ -1115,7 +1115,7 @@
             call mpdata_vec_1d(dt/real(n_step,sp),dz,dz,&
                             rho,kp,cen(cat_c)-cst(cat_c)+1,o_halo,o_halo,&
                             vqc(-o_halo+1:kp+o_halo),&
-                            q(:,cst(cat_c):cen(cat_c)),0,.false.)		
+                            q(:,cst(cat_c):cen(cat_c)),1,.false.)		
         enddo
 	endif
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
