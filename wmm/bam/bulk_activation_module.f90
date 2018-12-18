@@ -9,9 +9,9 @@
 									   r_air=287._sp,r_vap=461._sp,r_gas=8.314_sp,molw_vap=18.e-3_sp, &
 									   eps=r_air/r_vap,kappa=r_air/cp,rhow=1000._sp,sigma=72.e-3_sp
 									   ! private
-		real(sp) :: rhinit,tinit,pinit,w,  &
+		real(sp) :: rhinit,tinit,pinit,w, ndrop_test, &
 							mass_dummy,density_dummy,n_dummy,sig_dummy,d_dummy, &
-							tcb, pcb,xmin,a,smax, &
+							tcb, pcb,xmin,a,smax,smax1, &
 							alpha_sup, sigma_sup, g, chi, sd_dummy, s,c0   
 		! size n_mode
 		real(sp), allocatable, dimension(:) :: n_aer1, sig_aer1, d_aer1, &
@@ -25,7 +25,7 @@
 								  nu_core,act_frac,act_frac1, act_frac2 , &
 								  density_core1, & 
 								  molw_core1, & 
-								  nu_core1
+								  nu_core1, dcrit2
 		! size n_sv
 		real(sp), allocatable, dimension(:) :: molw_org, r_org, log_c_star, cstar, &
 												org_content, org_content1, &
@@ -52,14 +52,89 @@
 
 	private 
 	public :: ctmm_activation, allocate_arrays, initialise_arrays, &
-		read_in_bam_namelist, &
+		read_in_bam_namelist, find_d_and_s_crits, &
 		n_mode, n_sv, method_flag, giant_flag, sv_flag, &
 		p_test, t_test, w_test, a_eq_7, b_eq_7, n_aer1, d_aer1, sig_aer1, &
 		org_content1, molw_org1, log_c_star1, density_org1, nu_org1, delta_h_vap1, &
 		molw_core1, density_core1, nu_core1, act_frac1, &
-		r, mean_w, sigma_w, rs, seed, l, n_rand, rand_dist
+		r, mean_w, sigma_w, rs, seed, l, n_rand, rand_dist, &
+		smax1, dcrit2
 				
 	contains
+	
+	
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>root-find to solve for smax and dcrit needed so that drop number is achieved
+	!>parameterisation developed at university of manchester
+	!>@param[in] p,t
+	!>@param[inout] ndrop drop number concentration
+	!>@param[inout] scrit, dscrit
+	subroutine find_d_and_s_crits(p,t,ndrop,w,smax,dcrit)
+	    use nrtype1
+	    use nr1, only : zbrent
+	    implicit none
+	    real(sp), intent(in) :: p,t
+	    real(sp), intent(inout) :: ndrop, smax, w
+	    real(sp), dimension(n_mode), intent(inout) :: dcrit
+	    
+	    
+	    ! adjust ndrop to 99% of total aerosol number:
+	    ndrop=min(ndrop,0.99_sp*sum(n_aer1))
+        ndrop_test=ndrop
+        
+        ! for use inside the root-finder
+        pinit=p
+        tinit=t
+        ! find the updraft speed required to activate these aerosol particles
+        w=zbrent(find_wcbase,1.e-40_sp,100._sp,1.e-20_sp)
+        
+        ! call again so that dcrit1 and smax are properly set
+        call initialise_arrays(n_mode,n_sv,pinit,tinit,w, &
+                    n_aer1,d_aer1,sig_aer1, molw_org1,density_core1)
+
+        call ctmm_activation(n_mode,n_sv,sv_flag, &
+                    n_aer1, d_aer1,sig_aer1,molw_core1, &
+                    density_core1, nu_core1, &
+                    org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
+                    log_c_star1, &
+                    w, tinit,pinit, a_eq_7, b_eq_7, &
+                    act_frac1,smax,dcrit)
+        
+	    
+	end subroutine find_d_and_s_crits
+	
+	
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>root-finding helper function
+	!>@param[in] w
+	function find_wcbase(w)
+	    use nrtype1
+	    implicit none
+	    real(sp), intent(in) :: w
+	    real(sp) :: find_wcbase, smax
+	
+        call initialise_arrays(n_mode,n_sv,pinit,tinit,w, &
+                    n_aer1,d_aer1,sig_aer1, molw_org1,density_core1)
+
+        call ctmm_activation(n_mode,n_sv,sv_flag, &
+                    n_aer1, d_aer1,sig_aer1,molw_core1, &
+                    density_core1, nu_core1, &
+                    org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
+                    log_c_star1, &
+                    w, tinit,pinit, a_eq_7, b_eq_7, &
+                    act_frac1,smax,dcrit2)
+
+	    find_wcbase=ndrop_test-sum(act_frac1*n_aer1)
+	    
+	end function find_wcbase
+	
+	
+	
+	
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -78,12 +153,14 @@
 	!>@param[in] log_c_star1: volatility bins
 	!>@param[in] w1, t1, p1, a, b: vertical wind, temperature, pressure + params in ARG
 	!>@param[inout] act_frac1: activated fraction in each mode
+	!>@param[inout] smax1: maximum supersaturation
+	!>@param[inout] dcrit1: critical diameters in each mode
 	subroutine ctmm_activation(n_modes1,n_sv1,sv_flag, n_aer1,d_aer1,sig_aer1,molw_core1, &
 							   density_core1, nu_core1, org_content1, &
 							   molw_org1, density_org1, delta_h_vap1, nu_org1,  &
                                log_c_star1, &
                                w1, t1,p1,a_arg,b_arg, &
-							   act_frac1 )
+							   act_frac1,smax1,dcrit1)
 
 		use nrtype1
 		use nr1, only : zbrent,qsimp,qromb,brent,midpnt
@@ -94,7 +171,8 @@
 			  							density_org1, delta_h_vap1, nu_org1, log_c_star1                               
 			  real(sp), intent(in) :: w1,t1,p1, a_arg, b_arg
 			  integer, intent(in) :: n_modes1, n_sv1, sv_flag
-			  real(sp), dimension(:), intent(inout) :: act_frac1
+			  real(sp), dimension(:), intent(inout) :: act_frac1, dcrit1
+			  real(sp), intent(inout) :: smax1
 
 		integer(i4b):: i
 		
@@ -258,6 +336,8 @@
 
 			act_frac2=1._sp/(n_aer)*(n_aer*5.e-1_sp*(1._sp- &
 		     erf(2._sp*log(sm/smax)/(3._sp*sqrt(2._sp)*sig_aer) ))) ! eq 13: of 2000 paper
+
+            dcrit1=2._sp*a/3._sp*(2./smax/sqrt(b))**(2._sp/3._sp)
 		     
 		else if(method_flag.ge.2) then
 			a=4._sp*sigma*molw_vap/(rhow*r_gas*tcb)             ! eq 5: abdul-razzak, ghan
@@ -284,9 +364,13 @@
 
 			act_frac2=1._sp/(n_aer)*(n_aer*5.e-1_sp*(1._sp- &
 			 erf(2._sp*log(sgi/smax)/(3._sp*sqrt(2._sp)*sig_aer) )))! eq 13: of 2000 paper
+
+            dcrit2=( (4._sp*a**3) / (smax1**2 *(27._sp*b)) )**(1._sp/3._sp)
 		 end if
  
 		 act_frac1=act_frac2
+		 smax1=smax
+		 dcrit1=dcrit2
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
 	end subroutine ctmm_activation
@@ -670,16 +754,17 @@
 	!>@param[inout] nu_org1: van hoff factor in volatility bins
 	!>@param[inout] log_c_star1: log_c_star in volatility bins
 	!>@param[inout] act_frac1: activated fraction in modes
+	!>@param[inout] dcrit1: critical diameter in modes
 	subroutine allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
 			molw_core1,density_core1,nu_core1,org_content1, &
-			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, act_frac1)
+			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, act_frac1, dcrit1)
 		use nrtype1
 		implicit none
 		integer(i4b), intent(in) :: n_mode, n_sv
 		real(sp), dimension(:), allocatable, intent(inout) :: n_aer1,d_aer1,sig_aer1, &
 							molw_core1, density_core1, nu_core1, org_content1, &
 							molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, &
-							act_frac1
+							act_frac1, dcrit1
 		
 		integer(i4b) :: AllocateStatus
 		allocate( n_aer(1:n_mode), STAT = AllocateStatus)
@@ -733,6 +818,8 @@
 		allocate( act_frac1(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( act_frac2(1:n_mode), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+		allocate( dcrit1(1:n_mode), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		
 		allocate( molw_org(1:n_sv), STAT = AllocateStatus)
@@ -898,7 +985,7 @@
 		call allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
 			molw_core1,density_core1,nu_core1,org_content1, &
 			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, &
-			act_frac1)
+			act_frac1,dcrit2)
         
         read(8,nml=bulk_aerosol_spec)
         close(8)
