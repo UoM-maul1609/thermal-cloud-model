@@ -624,7 +624,7 @@
             temp1=sum(n_aer1*act_frac1)
             !temp1=10.e6_sp
 !             q(k-1,4)=temp1
-            q(k,4)=q(k,4)+temp1
+            q(k,4)=temp1
 !             q(k+1,4)=temp1
 !             q(k+2,4)=temp1
         endif      
