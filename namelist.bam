@@ -1,6 +1,6 @@
 
  &run_vars
-	outputfile = '/tmp/output1.nc',
+	outputfile = '/tmp/output2.nc',
 	runtime=3000.,
 	ip=200,
 	kp=200,
@@ -19,9 +19,9 @@
 	                     ! 2 (bulk scheme #2)
 	bam_nmlfile='wmm/bam/namelist.in', ! filename of bam namelist
 	hm_flag=.true.,	     ! switch hm process on / off
-	theta_flag=.false.,  ! advect theta
+	theta_flag=.true.,  ! advect theta
 	drop_num_init=.true., ! only works for microphysics_flag=2
-	num_drop=1000.e6, ! initial drop number concentration
+	num_drop=100.e6, ! initial drop number concentration
 	ice_init=.true.,     ! flag to initialise ice only works for microphysics_flag=1
 	num_ice=1000.,      ! number conc of primary ice crystals /kg
 	mass_ice=1.e-14/    ! mass of new ice crystal  
@@ -30,7 +30,7 @@
     q_init =.true.,.false.,.false.,.false.,.false./ ! whether to initialise or noT
  &sounding_spec ! environmental sounding parameters
  	adiabatic_prof=.true.,
- 	adiabatic_frac=0.2,
+ 	adiabatic_frac=0.1,
  	psurf=100000.,
  	tsurf=300.,
  	t_cbase=290.,
