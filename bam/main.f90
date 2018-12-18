@@ -28,7 +28,7 @@
     		a_eq_7, b_eq_7, &
     		r, mean_w, sigma_w, rs, seed, l, n_rand, rand_dist, &
     		allocate_arrays, ctmm_activation, initialise_arrays, &
-    		read_in_bam_namelist
+    		read_in_bam_namelist, smax1, dcrit2
         implicit none
 
         character (len=200) :: nmlfile = ' '
@@ -69,7 +69,7 @@
 						org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
 						log_c_star1, &
 						w_test, t_test,p_test, a_eq_7, b_eq_7, &
-						act_frac1)
+						act_frac1,smax1,dcrit2)
 			print *,w_test,act_frac1,  sum(act_frac1*n_aer1)
 		else
 			! random number generator
@@ -104,7 +104,7 @@
 							org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1,  &
 							log_c_star1, &
 							w_test, t_test,p_test, a_eq_7, b_eq_7, &
-							act_frac1)
+							act_frac1,smax1,dcrit2)
 				print *,w_test,act_frac1,  sum(act_frac1*n_aer1)
 			enddo
 			deallocate(seed)
