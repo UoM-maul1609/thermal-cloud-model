@@ -1,5 +1,5 @@
 Brief:
-	*Warm Micro-Physics Module (WPM).
+	*Prognostic Aerosol Micro-Physics Module (PAMM).
 	 A 2-moment warm bulk cloud microphysics module for use with various models.
 Compilation:
 	*Type "make" to compile the micro_lib.a library
