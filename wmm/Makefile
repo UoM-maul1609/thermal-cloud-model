@@ -21,10 +21,12 @@ FFLAGS2 =  $(DEBUG) -O0 -o
 
 wmicro_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
-				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ) bam_code
+				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ) bam_code 
 	$(AR) rc wmicro_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
-				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ)
+				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ) \
+				$(BAM_DIR)/nr_code.$(OBJ) $(BAM_DIR)/bulk_activation_module.$(OBJ) \
+				$(BAM_DIR)/random.$(OBJ)		
 locate.$(OBJ)	: locate.f90
 	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
 polint.$(OBJ)	: polint.f90
