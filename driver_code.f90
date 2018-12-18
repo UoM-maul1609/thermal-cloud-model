@@ -16,6 +16,8 @@
 	!> then advects particles
 	!>@param[in] nq: number of q fields
 	!>@param[in] nprec: number of precipitation arrays
+	!>@param[in] ncat: number of categories
+	!>@param[in] n_mode: number of modes
 	!>@param[in] ip: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] ord: order of advection scheme
@@ -23,6 +25,10 @@
 	!>@param[in] runtime
 	!>@param[in] dt - timestep
 	!>@param[in] cvis: coefficient for viscosity
+	!>@param[in] c_s, c_e: start and end indices for a category
+	!>@param[in] inc, iqc: indices for cloud number and mass
+	!>@param[in] cat_c, cat_r: category index for cloud and rain
+	!>@param[in] q_name: name of categories
 	!>@param[in] dx,dz - grid spacing
 	!>@param[in] dx2,dz2 - grid spacing
 	!>@param[inout] q, qold, theta, th_old, pressure, 
@@ -47,8 +53,13 @@
 	!>@param[in] w_peak
 	!>@param[in] z_offset
 	!>@param[inout] therm_init
-    subroutine model_driver_2d(nq,nprec,ip,kp,ord,o_halo,runtime, &
+    subroutine model_driver_2d(nq,nprec,ncat, n_mode, &
+                               ip,kp,ord,o_halo,runtime, &
                                dt,cvis,  &
+                               c_s, c_e, &
+                               inc, iqc, &
+                               cat_c, cat_r, &
+                               q_name, &
                                q,qold, precip,theta,th_old, p,dx,dz,dx2,dz2,x,xn,z,zn,t,rho,&
                                u,w,delsq, vis, &
                                new_file,micro_init,advection_scheme, monotone, &
@@ -65,10 +76,14 @@
     use advection_s_2d, only : mpdata_2d, mpdata_vec_2d
     use micro_module
     use w_micro_module
+    use p_micro_module
 
     implicit none
-    integer(i4b), intent(in) :: nq,nprec,ip,kp, ord, o_halo, advection_scheme
+    integer(i4b), intent(in) :: nq,nprec,ncat, ip,kp, ord, o_halo, advection_scheme, &
+                                inc, iqc, n_mode, cat_c, cat_r
     real(sp), intent(in) :: runtime, dt, dx,dz, cvis
+    integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
+    character(len=20), dimension(nq) :: q_name
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q, &
                                                                                     qold
     real(sp), dimension(1:kp,1:ip,nprec), intent(inout) :: precip
@@ -90,7 +105,11 @@
     ! local variables
     integer(i4b) :: nt, i, j, l,nsteps, iter
     real(sp) :: time
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: rhoa
 
+    
+    ! fudge because dynamics is solenoidal for rhoa=const
+    rhoa=1._sp
     
     nt=ceiling(runtime / real(dt,kind=sp) )
     do i=1,nt
@@ -103,7 +122,7 @@
 						b,del_gamma_mac,del_c_s,del_c_t, &
     						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)   	
         ! output:
-        call output_2d(time,nq,nprec,ip,kp,q(1:kp,1:ip,:),precip(1:kp,1:ip,:), &
+        call output_2d(time,nq,nprec,ip,kp,q_name, q(1:kp,1:ip,:),precip(1:kp,1:ip,:), &
 						theta(1:kp,1:ip),p(1:kp,1:ip), &
 						x(1:ip),xn(1:ip),z(1:kp),zn(1:kp), &
 						t(1:kp,1:ip),u(1:kp,1:ip),w(1:kp,1:ip),new_file)
@@ -158,7 +177,7 @@
 						call set_halos_2d(ip,kp,o_halo,q(:,:,j))            
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
-						    rho,ip,kp,o_halo,o_halo,u,w,q(:,:,j),4,monotone)
+						    rhoa,ip,kp,o_halo,o_halo,u,w,q(:,:,j),4,monotone)
 						
 					enddo
 					if(theta_flag) then
@@ -166,7 +185,30 @@
 						call set_halos_2d(ip,kp,o_halo,theta)        
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
-						    rho,ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
+						    rhoa,ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
+					endif
+				enddo
+			
+			case(3) ! mpdata sfvt
+				do iter=1,nsteps
+					do j=1,nq
+						! set halos
+						call set_halos_2d(ip,kp,o_halo,q(:,:,j))            						
+					enddo
+
+					do j=1,ncat
+						! advection sfvt
+						call mpdata_vec_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
+						    rhoa,ip,kp,c_e(j)-c_s(j)+1,o_halo,o_halo,u,w,&
+						    q(:,:,c_s(j):c_e(j)),4,monotone)
+                    enddo
+                    
+					if(theta_flag) then
+						! set halos
+						call set_halos_2d(ip,kp,o_halo,theta)        
+						! advection
+						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
+						    rhoa,ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
 					endif
 				enddo
 			
@@ -224,6 +266,14 @@
 						   
 		else if (microphysics_flag .eq. 2) then
 			call w_microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
+							theta(:,:),p(:,:), &
+						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
+						   theta_flag)		
+						   
+		else if (microphysics_flag .eq. 3) then
+			call p_microphysics_2d(nq,ncat,n_mode,c_s,c_e, inc, iqc,&
+			                cat_c, cat_r, &
+                            ip,kp,o_halo,dt,dz2,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
 						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
 						   theta_flag)		

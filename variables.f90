@@ -15,12 +15,20 @@
 		!>main model prognostic variables
         type grid
             ! variables for grid
-            integer(i4b) :: n_levels
+            integer(i4b) :: n_levels,nq,ncat, nprec, &
+                            iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
+                            cat_c, cat_r
             real(sp) :: dx,dz, dt
             real(sp), dimension(:,:,:), allocatable :: q, qold, precip
             real(sp), dimension(:,:), allocatable :: theta, th_old, &
                 p, rho, t, u, w,delsq, vis
             real(sp), dimension(:), allocatable :: x,z,xn,zn, dx2, dz2
+
+            ! point to the start and end of a category
+            integer(i4b), dimension(:), allocatable :: c_s, c_e
+            character(len=20), dimension(:), allocatable :: q_name
+            integer(i4b), dimension(:), allocatable :: q_type
+            integer(i4b) :: n_mode
         end type grid
 
 		!>@brief
@@ -41,7 +49,8 @@
             ! variables for io
             integer(i4b) :: ncid, varid, x_dimid, y_dimid, z_dimid, &
                             dimids(2), a_dimid, xx_dimid, yy_dimid, &
-                            zz_dimid, i_dimid, j_dimid, k_dimid, nq_dimid, nprec_dimid
+                            zz_dimid, i_dimid, j_dimid, k_dimid, nq_dimid, &
+                            lq_dimid, nprec_dimid
             integer(i4b) :: icur=1
             logical :: new_file=.true.
         end type io

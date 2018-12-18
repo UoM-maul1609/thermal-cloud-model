@@ -69,7 +69,9 @@
 	!>@param[in] dz vertical resolution of grid
 	!>@param[in] dx2 horizontal resolution of grid
 	!>@param[in] dz2 vertical resolution of grid
-	!>@param[inout] q, qold, precip, theta, th_old, 
+	!>@param[inout] q, qold, 
+	!>@param[in] iqv,iqc,inc,iqi,ini
+	!>@param[inout] precip, theta, th_old, 
 	!>             pressure, x,xn,z,zn, temperature, rho,u,w, delsq, vis
 	!>@param[in] drop_num_init: flag to initialise number of drops where liquid water>0
 	!>@param[in] number conc of drops #/kg
@@ -82,6 +84,7 @@
     						t_ctop, adiabatic_prof, adiabatic_frac,q_type,q_init, &
                              z_read,theta_read,q_read, &
                              ip,kp,o_halo,dx,dz,dx2,dz2,q,qold, &
+                             iqv,iqc,inc,iqi,ini,&
                              precip,theta,th_old, p,x,xn,z,zn,t,rho,u,w,&
                              delsq, vis, &
                              drop_num_init, num_drop, &
@@ -111,6 +114,7 @@
                                                             vis
     real(sp), dimension(:), allocatable, intent(inout) :: x, z,xn,zn, dx2, dz2
     real(sp), dimension(:,:,:), allocatable, intent(inout) :: q, qold, precip
+    integer(i4b), intent(in) :: iqv, iqc, inc, iqi, ini
     ! local variables:
     integer(i4b) :: i,j, iloc, AllocateStatus, istore,istore2
     real(sp) :: var, dummy
@@ -210,7 +214,7 @@
 		! adiabatic temperature
 		t(-o_halo+1:istore,:)=theta_surf*(p(-o_halo+1:istore,:)/1.e5_sp)**(ra/cp)
 		! adiabatic vapour mixing ratio - at all levels below CB:
-		q(-o_halo+1:istore,:,1)=eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase))
+		q(-o_halo+1:istore,:,iqv)=eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase))
         ! ---- Dry adiabat done
 
 
@@ -264,12 +268,13 @@
 		enddo
 		istore2=i-1
 		do i=istore,istore2
-			q(i,:,1)=eps1*svp_liq(t(i,1))/ &
+			q(i,:,iqv)=eps1*svp_liq(t(i,1))/ &
 								(p(i,1)-svp_liq(t(i,1)))
-			q(i,:,2)=adiabatic_frac* &
-					max(eps1*svp_liq(t_cbase)/(p1-svp_liq(t_cbase)) - q(1,i,1),0._sp)
-			if(drop_num_init .and. (microphysics_flag .eq. 2)) then
-			    q(i,:,4) = num_drop
+			q(i,:,iqc)=adiabatic_frac* &
+					max(q(1,i,iqv)-eps1*svp_liq(t(i,1))/(p(i,1)-svp_liq(t(i,1))) ,0._sp)
+			if(drop_num_init .and. &
+			    ((microphysics_flag .eq. 2) .or. (microphysics_flag .eq. 3))) then
+			    q(i,:,inc) = num_drop
 			endif
 		enddo
 
@@ -307,7 +312,7 @@
                 p111=p(i+1,1)
                 t(i+1,:)=zbrent(calc_theta_q,t(i+1,1),t1old*1.01_sp,1.e-5_sp)
             
-                q(i,:,1)=0.95_sp*eps1*svp_liq(t(i,1))/ &
+                q(i,:,iqv)=0.95_sp*eps1*svp_liq(t(i,1))/ &
                                     (p(i,1)-svp_liq(t(i,1)))
             enddo
         case default
@@ -322,8 +327,8 @@
 		! initialise ice crystals
 		if(ice_init .and. (microphysics_flag .eq. 1)) then
             where(t(istore:istore2,:).lt.ttr)
-                q(istore:istore2,:,6)=num_ice*mass_ice
-                q(istore:istore2,:,7)=num_ice
+                q(istore:istore2,:,iqi)=num_ice*mass_ice
+                q(istore:istore2,:,ini)=num_ice
             end where
         endif
 	else

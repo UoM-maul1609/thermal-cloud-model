@@ -16,9 +16,11 @@
 	!>@param[in] nprec number of precipitation fields
 	!>@param[in] ip number of horizontal levels
 	!>@param[in] kp number of vertical levels
+	!>@param[in] q_name: name of q-variables
 	!>@param[in] q, precip, theta, pressure, x,xn,z,zn, temperature,u,w
 	!>@param[inout] new_file
-    subroutine output_2d(time,nq,nprec,ip,kp,q,precip,theta,p,x,xn,z,zn,t,u,w,new_file)
+    subroutine output_2d(time,nq,nprec,ip,kp,q_name, &
+                        q,precip,theta,p,x,xn,z,zn,t,u,w,new_file)
 
     use nrtype
     use netcdf
@@ -27,6 +29,7 @@
     implicit none
     real(sp), intent(in) :: time
     integer(i4b), intent(in) :: nq,nprec,kp,ip
+    character(len=20), dimension(nq) :: q_name
     real(sp), dimension(kp,ip,nq), intent(in) :: q
     real(sp), dimension(kp,ip,nprec), intent(in) :: precip
     real(sp), dimension(kp,ip), intent(in) :: theta, p, t, u, w
@@ -48,6 +51,7 @@
         call check( nf90_def_dim(io1%ncid, "nprec", nprec, io1%nprec_dimid) )
         call check( nf90_def_dim(io1%ncid, "ip", ip, io1%i_dimid) )
         call check( nf90_def_dim(io1%ncid, "kp", kp, io1%k_dimid) )
+        call check( nf90_def_dim(io1%ncid, "l_q_names", 20, io1%lq_dimid) )
 
 
         ! close the file, freeing up any internal netCDF resources
@@ -61,6 +65,9 @@
         call check( nf90_redef(io1%ncid) )
 
 
+        ! define variable: q_names
+        call check( nf90_def_var(io1%ncid, "q_names", NF90_CHAR, &
+            (/io1%lq_dimid,io1%nq_dimid/), io1%varid) )
 
 
         ! define variable: time
@@ -188,6 +195,9 @@
 		! write x,xn,z,zn data to file                                           !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         call check( nf90_open(outputfile, NF90_WRITE, io1%ncid) )
+		call check( nf90_inq_varid(io1%ncid, "q_names", io1%varid ) )
+		call check( nf90_put_var(io1%ncid, io1%varid, q_name, start = (/1,1/)))
+
 		call check( nf90_inq_varid(io1%ncid, "x", io1%varid ) )
 		call check( nf90_put_var(io1%ncid, io1%varid, x, start = (/1/)))
         
