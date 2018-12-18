@@ -15,7 +15,7 @@
     use nrtype
     
     private
-    public :: microphysics_2d, microphysics_1d
+    public :: microphysics_2d, microphysics_1d,set_qnames
     
     ! physical constants
     real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
@@ -77,6 +77,73 @@
 	
     contains
     
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>read in the data from the namelists for the BAM module
+	!> and set variables for microphysics
+	!>@param[inout] q_name, q_type, c_s, c_e
+	!>@param[inout] nq,ncat, nprec, iqv, iqc, ini, iqi
+	subroutine set_qnames(q_name,q_type,c_s,c_e,nq,ncat,nprec, &
+	            iqv, iqc, ini, iqi)
+		implicit none
+        integer(i4b), intent(inout) :: nq, ncat, nprec, iqv, iqc, ini, iqi
+        integer(i4b), intent(inout), dimension(:), allocatable :: q_type, c_s, c_e
+        character(len=20), dimension(:), allocatable :: q_name
+        
+        integer(i4b) :: i
+        
+        
+        ncat=9
+        
+        
+        nq=9 ! vapour, cloud mass, rain mass, cloud water, rain water
+        
+        allocate(q_name(nq))
+        allocate(q_type(ncat))
+        allocate(c_s(ncat))
+        allocate(c_e(ncat))
+        
+        q_type(1)=0 ! vapour
+        c_s(1)=1
+        c_e(1)=1
+        q_type(2)=1 ! cloud water
+        c_s(2)=2
+        c_e(2)=2
+        q_type(3)=1 ! rain water
+        c_s(3)=3
+        c_e(3)=3
+        q_type(4)=1 ! snow water
+        c_s(4)=4
+        c_e(4)=4
+        q_type(5)=2 ! graupel water
+        c_s(5)=5
+        c_e(5)=5
+        q_type(6)=2 ! ice water
+        c_s(6)=6
+        c_e(6)=6
+        q_type(7)=2 ! ice water number
+        c_s(7)=7
+        c_e(7)=7
+        q_type(8)=2 ! snow water number
+        c_s(8)=8
+        c_e(8)=8
+        q_type(9)=2 ! graupel water number
+        c_s(9)=9
+        c_e(9)=9
+        
+        q_name=["qv","qc","qr","qs","qg","qi","ni","ns","ng"]
+        
+        nprec=4
+        
+        iqv=1
+        iqc=2
+        ini=7
+        iqi=6
+        
+	end subroutine set_qnames
+
+
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
