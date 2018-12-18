@@ -876,7 +876,7 @@
 	            enddo        
 	            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	            
-                if(minval(n_aer1) .lt. 0.1_sp) cycle
+                n_aer1=max(n_aer1,0.1_sp)
 	            
 	        
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -900,8 +900,17 @@
 
 
                 temp1=sum(n_aer1*act_frac1)
+                ! put in-cloud aerosol into aerosol
+                do i=1,n_mode
+                    q(kk,cst(i+1))=  q(kk,cst(i+1))+q(kk,cst(cat_c)+(i-1)*3+2)
+                    q(kk,cst(i+1)+1)=q(kk,cst(i+1)+1)+q(kk,cst(cat_c)+(i-1)*3+3)
+                    q(kk,cst(i+1)+2)=q(kk,cst(i+1)+2)+q(kk,cst(cat_c)+(i-1)*3+4)
+                    q(kk,cst(cat_c)+(i-1)*3+2)=0._sp
+                    q(kk,cst(cat_c)+(i-1)*3+3)=0._sp
+                    q(kk,cst(cat_c)+(i-1)*3+4)=0._sp
+                enddo
                 ! cloud droplet number
-                q(kk  ,inc)=q(kk  ,inc)+temp1
+                q(kk  ,inc)=temp1
                 ! deplete aerosol
                 do i=1,n_mode
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1090,7 +1099,7 @@
             call mpdata_vec_1d(dt/real(n_step,sp),dz,dz,&
                             rho,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
                             vqr(-o_halo+1:kp+o_halo),&
-                            q(:,cst(cat_r):cen(cat_r)),0,.false.)		
+                            q(:,cst(cat_r):cen(cat_r)),1,.false.)		
         enddo
 	endif
     ! cloud 
@@ -1106,7 +1115,7 @@
             call mpdata_vec_1d(dt/real(n_step,sp),dz,dz,&
                             rho,kp,cen(cat_c)-cst(cat_c)+1,o_halo,o_halo,&
                             vqc(-o_halo+1:kp+o_halo),&
-                            q(:,cst(cat_c):cen(cat_c)),0,.false.)		
+                            q(:,cst(cat_c):cen(cat_c)),1,.false.)		
         enddo
 	endif
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
