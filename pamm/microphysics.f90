@@ -900,8 +900,17 @@
 
 
                 temp1=sum(n_aer1*act_frac1)
+                ! put in-cloud aerosol into aerosol
+                do i=1,n_mode
+                    q(kk,cst(i+1))=  q(kk,cst(i+1))+q(kk,cst(cat_c)+(i-1)*3+2)
+                    q(kk,cst(i+1)+1)=q(kk,cst(i+1)+1)+q(kk,cst(cat_c)+(i-1)*3+3)
+                    q(kk,cst(i+1)+2)=q(kk,cst(i+1)+2)+q(kk,cst(cat_c)+(i-1)*3+4)
+                    q(kk,cst(cat_c)+(i-1)*3+2)=0._sp
+                    q(kk,cst(cat_c)+(i-1)*3+3)=0._sp
+                    q(kk,cst(cat_c)+(i-1)*3+4)=0._sp
+                enddo
                 ! cloud droplet number
-                q(kk  ,inc)=q(kk  ,inc)+temp1
+                q(kk  ,inc)=temp1
                 ! deplete aerosol
                 do i=1,n_mode
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
