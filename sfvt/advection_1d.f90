@@ -137,8 +137,10 @@
 #else
     psi_sum=psi_local_sum
 #endif
- 	if(psi_sum.lt.small) return
-	
+ 	if(psi_sum.lt.small) then 
+ 	    psi_in(:)=psi_in(:)+minglobal
+     	return
+	endif
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -359,7 +361,7 @@
             ! halos
 !             psi_old(:,-l_h+1:0)=psi_old(:,ip-l_h+1:ip)
             psi_old(0)=0._sp
-            psi_old(kp)=0._sp
+            psi_old(kp+1)=0._sp
             
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
 		endif		
@@ -464,8 +466,12 @@
 #else
     psi_sum=psi_local_sum
 #endif
- 	if(psi_sum.lt.small) return
-	
+ 	if(psi_sum.lt.small) then 
+ 	    do n=1,nq
+     	    psi_in(:,n)=psi_in(:,n)+minglobal(n)
+     	enddo
+     	return
+	endif
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -674,23 +680,23 @@
 		do n=1,nq
             call first_order_upstream_1d(dt,dz,rhoa,&
                     kp,l_h,r_h,wt,psi_in(:,n))
+            if((it <= kord) .and. (kord >= 1)) then
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! set halos													    		 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+    ! 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+    ! 									psi_old,dims,coords)
+                ! halos
+    !             psi_old(:,-l_h+1:0)=psi_old(:,ip-l_h+1:ip)
+                psi_in(0,n)=0._sp
+                psi_in(kp+1,n)=0._sp
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
+    		endif		
         enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 		
-		if((it <= kord) .and. (kord >= 1)) then
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! set halos																	 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-! 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-! 									psi_old,dims,coords)
-            ! halos
-!             psi_old(:,-l_h+1:0)=psi_old(:,ip-l_h+1:ip)
-            psi_old(0)=0._sp
-            psi_old(kp)=0._sp
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
-		endif		
  	enddo
  
 

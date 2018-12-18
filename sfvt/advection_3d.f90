@@ -168,8 +168,10 @@
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip))
 	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
- 	if(psi_sum.lt.small) return
-	
+ 	if(psi_sum.lt.small) then
+ 	    psi_in(:,:,:)=psi_in(:,:,:)+minglobal
+ 	    return
+	endif
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -713,8 +715,12 @@
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip,1))
 	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
- 	if(psi_sum.lt.small) return
-	
+ 	if(psi_sum.lt.small) then 
+ 	    do n=1,nq
+ 	        psi_in(:,:,:,n)=psi_in(:,:,:,n)+minglobal(n)
+ 	    enddo
+ 	    return
+	endif
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1091,19 +1097,19 @@
 		do n=1,nq
             call first_order_upstream_3d(dt,dx,dy,dz,rhoa,&
                     ip,jp,kp,l_h,r_h,ut,vt,wt,psi_in(:,:,:,n))
+            if((it <= kord) .and. (kord >= 1)) then
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! set halos																 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+                call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                        psi_in(:,:,:,n),dims,coords)
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
+            endif		
         enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 		
-		if((it <= kord) .and. (kord >= 1)) then
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! set halos																	 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-									psi_old,dims,coords)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
-		endif		
  	enddo
  
 
