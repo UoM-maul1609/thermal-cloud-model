@@ -271,7 +271,7 @@
 			q(i,:,iqv)=eps1*svp_liq(t(i,1))/ &
 								(p(i,1)-svp_liq(t(i,1)))
 			q(i,:,iqc)=adiabatic_frac* &
-					max(q(1,i,iqv)-eps1*svp_liq(t(i,1))/(p(i,1)-svp_liq(t(i,1))) ,0._sp)
+					max(q(1,1,iqv)-eps1*svp_liq(t(i,1))/(p(i,1)-svp_liq(t(i,1))) ,0._sp)
 			if(drop_num_init .and. &
 			    ((microphysics_flag .eq. 2) .or. (microphysics_flag .eq. 3))) then
 			    q(i,:,inc) = num_drop
