@@ -23,7 +23,7 @@
     
     private
     public :: p_microphysics_2d, p_microphysics_1d, read_in_pamm_bam_namelist, &
-            p_initialise_aerosol
+            p_initialise_aerosol, p_initialise_aerosol_1d
     
     ! physical constants
     real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
@@ -278,12 +278,127 @@
 
 
     
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>initialises aerosol profile
+	!>@param[in] nq, ncat: number of q variables, categories
+	!>@param[in] c_s, c_e: start and end pointers for categories
+	!>@param[in] inc: pointer to drop number category
+	!>@param[in] kp, o_halo: number of i, k and halo points
+	!>@param[in] z,rho, p, t: grid values
+	!>@param[inout] q: q_variables
+    subroutine p_initialise_aerosol_1d(nq,ncat,c_s,c_e, &
+                inc, kp,o_halo, z,rho,p,t,q)
+                
+        use bam, only : n_mode, n_sv, n_aer1, d_aer1, sig_aer1, density_core1, &
+                    nu_core1, molw_core1, org_content1, molw_org1, density_org1, &
+                    delta_h_vap1, nu_org1, log_c_star1, a_eq_7, b_eq_7, &
+                    initialise_arrays, ctmm_activation,find_d_and_s_crits
+        implicit none
+        ! arguments:
+        integer(i4b), intent(in) :: nq, ncat, inc, kp, o_halo
+        integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
+        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
+        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: &
+    					rho, p, t
+        real(sp), dimension(-o_halo+1:kp+o_halo,nq), &
+            intent(inout) :: q
+
+        ! local variables
+        integer(i4b) :: i, k, AllocateStatus
+        real(sp) :: w, smax, phi, xx, kmom
+        real(sp), dimension(:), allocatable :: act_frac1 , dcrit
+         
+        
+        allocate(act_frac1(1:n_mode))
+        if(AllocateStatus /= 0) STOP "*** Not enough memory ***"
+        allocate(dcrit(1:n_mode))
+        if(AllocateStatus /= 0) STOP "*** Not enough memory ***"
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! initialise prognostic aerosol profiles:                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do i=1,n_mode
+            ! zeroth moment:
+            q(:,(i-1)*3+2)=n_aer1(i) 
+            ! surface area: 2nd moment x pi:
+            q(:,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
+            ! mass: 3rd moment x pi/6*rho:
+            q(:,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
+                ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
+                 
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 1. find the critical diameter of each aerosol mode, and                        !
+        ! 2. perform integration to set the aerosol n,s,m, in cloud water                !                         !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do k=1,kp
+            ! initialise aerosol in cloud water    
+            !  
+            if(q(k,(n_mode-1)*3+5) .gt. 0._sp) then 
+
+                
+                call find_d_and_s_crits(p(k),t(k),q(k,(n_mode-1)*3+5),w,smax,dcrit)
+                ! dcrit is set now
+                ! partial moments of a lognormal distribution:
+                ! see:
+                ! https://math.stackexchange.com/questions/2055782/partial_expectations_of_lognormal_distributions
+                do i=1,n_mode
+                    ! number
+                    q(k,(n_mode-1)*3+7+(i-1)*3)= &
+                        ln_part_mom(0,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
+                    q(k,(i-1)*3+2)=q(k,(i-1)*3+2)-q(k,(n_mode-1)*3+7+(i-1)*3)
+                    
+                    
+                    ! surface area
+                    q(k,(n_mode-1)*3+8+(i-1)*3)= pi* &
+                        ln_part_mom(2,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
+                    q(k,(i-1)*3+3)=q(k,(i-1)*3+3)-q(k,(n_mode-1)*3+8+(i-1)*3)
+                    
+                    
+                    ! mass
+                    q(k,(n_mode-1)*3+9+(i-1)*3)= pi/6._sp*density_core1(i)* &
+                        ln_part_mom(3,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
+                    q(k,(i-1)*3+4)=q(k,(i-1)*3+4)-q(k,(n_mode-1)*3+9+(i-1)*3)
+                enddo
+                
+                
+            else
+                smax=0._sp
+                dcrit=1000._sp
+            endif
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+        
+
+        deallocate(act_frac1)
+        deallocate(dcrit)
+                
+    end subroutine p_initialise_aerosol_1d
+    
+    
 
 
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
 	!>initialises aerosol profile
+	!>@param[in] nq, ncat: number of q variables, categories
+	!>@param[in] c_s, c_e: start and end pointers for categories
+	!>@param[in] inc: pointer to drop number category
+	!>@param[in] ip, kp, o_halo: number of i, k and halo points
+	!>@param[in] x,z,rho, p, t: grid values
+	!>@param[inout] q, q_old: q_variables
     subroutine p_initialise_aerosol(nq,ncat,c_s,c_e, &
                 inc, ip,kp,o_halo, x,z,rho,p,t,q,q_old)
                 
