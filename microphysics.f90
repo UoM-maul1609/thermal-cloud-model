@@ -1174,7 +1174,7 @@
             do i=1,n_mode
                 dummy1=dummy1+q(k,cst(cat_r)+(i-1)*3+2)
             enddo
-            dummy1=max(dummy1,q(k,cst(cat_r)))
+            dummy1=max(dummy1,q(k,cst(cat_r)),1._sp)
         
             do i=1,n_mode
                 ! add aerosol in rain water back to aerosol
