@@ -1149,9 +1149,6 @@
     ! liquid number
     q(1:kp,inc)=q(1:kp,inc)-min(-(rcwaut+rcwacr+rcwsel)*dt/q(1:kp,inc),1._sp)* &
                             q(1:kp,inc)
-    ! rain number
-    q(1:kp,cst(cat_r))=q(1:kp,cst(cat_r))+ &
-        (rraut+rrsel-prevp*(q(1:kp,cst(cat_r))/(q(1:kp,cst(cat_r)+1)+qsmall)))*dt
         
     do k=-o_halo+1,kp+o_halo
         if(q(k,iqc) .lt. qsmall) then
@@ -1191,6 +1188,9 @@
         endif
     enddo
     
+    ! rain number
+    q(1:kp,cst(cat_r))=q(1:kp,cst(cat_r))+ &
+        (rraut+rrsel-prevp*(q(1:kp,cst(cat_r))/(q(1:kp,cst(cat_r)+1)+qsmall)))*dt
 
     q=max(q,0._sp)	 
     if (theta_flag) theta=t*(1.e5_sp/p)**(ra/cp)
