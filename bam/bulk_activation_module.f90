@@ -337,7 +337,7 @@
 			act_frac2=1._sp/(n_aer)*(n_aer*5.e-1_sp*(1._sp- &
 		     erf(2._sp*log(sm/smax)/(3._sp*sqrt(2._sp)*sig_aer) ))) ! eq 13: of 2000 paper
 
-            dcrit1=2._sp*a/3._sp*(2./smax/sqrt(b))**(2._sp/3._sp)
+            dcrit2=2._sp*a/3._sp*(2./smax/sqrt(b))**(2._sp/3._sp)
 		     
 		else if(method_flag.ge.2) then
 			a=4._sp*sigma*molw_vap/(rhow*r_gas*tcb)             ! eq 5: abdul-razzak, ghan
@@ -370,7 +370,8 @@
  
 		 act_frac1=act_frac2
 		 smax1=smax
-		 dcrit1=dcrit2
+		 dcrit1(1:n_modes1)=dcrit2(1:n_modes1)
+		 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
 	end subroutine ctmm_activation

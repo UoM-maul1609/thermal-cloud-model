@@ -623,10 +623,10 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             temp1=sum(n_aer1*act_frac1)
             !temp1=10.e6_sp
-            q(k-1,4)=temp1
+!             q(k-1,4)=temp1
             q(k,4)=temp1
-            q(k+1,4)=temp1
-            q(k+2,4)=temp1
+!             q(k+1,4)=temp1
+!             q(k+2,4)=temp1
         endif      
         
     
@@ -831,14 +831,15 @@
             ! cloud num self collection: equation a9 in Seifert and Beheng (2001, atmos res)
             rcwsel=-kr*(alpha_c+2._sp)/(alpha_c+1._sp)*lc**2-rcwaut
 
-!             factor1=min(lc/dt,praut+pracw)
-!             factor2=min(nc1/dt,-(rcwaut+rcwacr+rcwsel))
-! 
-!             praut=praut/factor1
-!             pracw=pracw/factor1
-!             rcwaut=rcwaut/factor2
-!             rcwacr=rcwacr/factor2
-!             rcwsel=rcwsel/factor2
+            factor1=min(lc/dt,praut+pracw)/(praut+pracw)
+            factor2=min(nc1/dt,-(rcwaut+rcwacr+rcwsel))/(-(rcwaut+rcwacr+rcwsel))
+
+            praut=praut*factor1
+            pracw=pracw*factor1
+            rcwaut=rcwaut*factor2
+            rcwacr=rcwacr*factor2
+            rcwsel=rcwsel*factor2
+
 
             
             praut=praut/rho
