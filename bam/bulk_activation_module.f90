@@ -371,6 +371,7 @@
 		 act_frac1=act_frac2
 		 smax1=smax
 		 dcrit1(1:n_modes1)=dcrit2(1:n_modes1)
+		 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
 	end subroutine ctmm_activation
