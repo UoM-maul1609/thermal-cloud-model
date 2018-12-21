@@ -68,9 +68,10 @@
         logical :: micro_init=.true., adiabatic_prof=.false.
         real(sp) :: adiabatic_frac
         logical :: monotone=.true.,viscous_dissipation=.false.,theta_flag=.false., &
-        			hm_flag=.true.
+        			hm_flag=.true., aero_prof_flag=.true.
 		integer(i4b) :: advection_scheme=0,microphysics_flag=0, above_cloud=0
 		character (len=200) :: bam_nmlfile = ' '
+		character (len=200) :: aero_nmlfile = ' '
 
         ! variables for model
         real(sp), allocatable,dimension(:,:) :: q_read ! nq x nlevels_r

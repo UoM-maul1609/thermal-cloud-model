@@ -46,7 +46,7 @@
                     nq, nprec, &
         			advection_scheme, ord, halo, &
         			monotone, viscous_dissipation, microphysics_flag, &
-        			bam_nmlfile, hm_flag, theta_flag, &
+        			bam_nmlfile, aero_nmlfile, aero_prof_flag, hm_flag, theta_flag, &
         			drop_num_init, num_drop, ice_init, &
         			num_ice, mass_ice
         namelist /run_vars2/ q_type, q_init
@@ -94,6 +94,7 @@
                     grid1%iqv, grid1%iqc, grid1%inc)
             case(3) ! pamm
                 call read_in_pamm_bam_namelist(bam_nmlfile, &
+                    aero_nmlfile, aero_prof_flag, &
                     grid1%q_name,grid1%q_type,grid1%c_s,grid1%c_e,grid1%nq,&
                     grid1%ncat, &
                     grid1%nprec, grid1%n_mode, &
@@ -133,7 +134,8 @@
         ! initialise aerosol for microphysics_flag==3                          !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(microphysics_flag .eq. 3) then
-            call p_initialise_aerosol(grid1%nq,grid1%ncat,grid1%c_s,grid1%c_e, &
+            call p_initialise_aerosol(aero_prof_flag, &
+                        grid1%nq,grid1%ncat,grid1%c_s,grid1%c_e, &
                         grid1%inc, &
                         ip,kp,o_halo, &
                         grid1%x,grid1%z,grid1%rho,&

@@ -19,6 +19,8 @@
 	                     ! 2 (bulk scheme #2)
 	                     ! 3 (bulk scheme #3)
 	bam_nmlfile='pamm/bam/namelist.in', ! filename of bam namelist
+	aero_nmlfile='pamm/namelist.in', ! filename of aerosol profile namelist
+	aero_prof_flag=.true., ! flag to read in a profile of aerosol
 	hm_flag=.true.,	     ! switch hm process on / off
 	theta_flag=.true.,  ! advect theta
 	drop_num_init=.true., ! only works for microphysics_flag=2
