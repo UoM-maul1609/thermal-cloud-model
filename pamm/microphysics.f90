@@ -14,6 +14,7 @@
 	!>microphysics code for the different cloud models
     module p_micro_module
     use nrtype
+    use nr, only : locate, polint
     use bam, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
         	n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, nu_core1, org_content1, &
         	molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, p_test, t_test, &
@@ -89,7 +90,9 @@
 	integer(i4b) :: k
 	real(sp) :: isnow, iice, f1,f2,a,b, qsmall=1e-30_sp
 	
-	
+	integer :: n_modes_prof, n_levels_s
+	real(sp), allocatable, dimension(:,:) :: n_read, sig_read, d_read
+	real(sp), allocatable, dimension(:) :: z_read
     contains
     
 	!>@author
@@ -173,7 +176,10 @@
 	
 	end subroutine ln_params_from_integral_moms
 	
-	
+
+
+
+
 	
 
 
@@ -182,24 +188,61 @@
 	!>@brief
 	!>read in the data from the namelists for the BAM module
 	!> and set variables for microphysics
-	!>@param[in] nmlfile
+	!>@param[in] nmlfile, aero_nmlfile
+	!>@param[in] aero_prof_flag
 	!>@param[inout] q_name, q_type, c_s, c_e
 	!>@param[inout] nq,ncat, nprec, iqv, iqc, inc, n_modeg, cat_c, cat_r
-	subroutine read_in_pamm_bam_namelist(nmlfile, &
+	subroutine read_in_pamm_bam_namelist(nmlfile, aero_nmlfile, &
+	            aero_prof_flag, &
                 q_name,q_type,c_s,c_e,nq,ncat,nprec,n_modeg, &
                 iqv,iqc,inc, cat_c, cat_r)
 		use bam, only : read_in_bam_namelist, n_mode
 		implicit none
+        logical :: aero_prof_flag
         character (len=200), intent(in) :: nmlfile
+        character (len=200), intent(in) :: aero_nmlfile
         integer(i4b), intent(inout) :: nq, ncat, nprec, iqv, iqc, inc, cat_c, cat_r
         integer(i4b), intent(inout) :: n_modeg
         integer(i4b), intent(inout), dimension(:), allocatable :: q_type, c_s, c_e
         character(len=20), dimension(:), allocatable :: q_name
         
         integer(i4b) :: i
+        ! define namelists for aerosol profile
+        namelist /aerosol_profile/ n_modes_prof, n_levels_s
+        namelist /aerosol_profile_data/ n_read,sig_read,d_read,z_read
         
         ! read in namelist
         call read_in_bam_namelist(nmlfile)
+        
+        if(aero_prof_flag) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! read in aerosol profile num modes									   !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            open(8,file=aero_nmlfile,status='old', recl=80, delim='apostrophe')
+            read(8,nml=aerosol_profile)
+            if(n_modes_prof .gt. n_mode) then
+                !n_modes_prof=n_mode
+            else
+                n_mode=n_modes_prof
+            endif
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! allocate and read aerosol profile data 							   !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            allocate(n_read(n_modes_prof,n_levels_s))
+            allocate(sig_read(n_modes_prof,n_levels_s))
+            allocate(d_read(n_modes_prof,n_levels_s))
+            allocate(z_read(n_levels_s))
+            read(8,nml=aerosol_profile_data)
+            close(8)
+            if(n_modes_prof .gt. n_mode) then
+                n_modes_prof=n_mode
+            endif
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        endif        
+        
         n_modeg=n_mode
         ncat=3+n_mode
 
@@ -282,13 +325,14 @@
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
 	!>initialises aerosol profile
+	!>@param[in] aero_prof_flag
 	!>@param[in] nq, ncat: number of q variables, categories
 	!>@param[in] c_s, c_e: start and end pointers for categories
 	!>@param[in] inc: pointer to drop number category
 	!>@param[in] kp, o_halo: number of i, k and halo points
 	!>@param[in] z,rho, p, t: grid values
 	!>@param[inout] q: q_variables
-    subroutine p_initialise_aerosol_1d(nq,ncat,c_s,c_e, &
+    subroutine p_initialise_aerosol_1d(aero_prof_flag,nq,ncat,c_s,c_e, &
                 inc, kp,o_halo, z,rho,p,t,q)
                 
         use bam, only : n_mode, n_sv, n_aer1, d_aer1, sig_aer1, density_core1, &
@@ -297,6 +341,7 @@
                     initialise_arrays, ctmm_activation,find_d_and_s_crits
         implicit none
         ! arguments:
+        logical :: aero_prof_flag
         integer(i4b), intent(in) :: nq, ncat, inc, kp, o_halo
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
         real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
@@ -306,8 +351,8 @@
             intent(inout) :: q
 
         ! local variables
-        integer(i4b) :: i, k, AllocateStatus
-        real(sp) :: w, smax, phi, xx, kmom
+        integer(i4b) :: i, k, AllocateStatus, iloc
+        real(sp) :: w, smax, phi, xx, kmom, var, dummy
         real(sp), dimension(:), allocatable :: act_frac1 , dcrit
          
         
@@ -319,27 +364,48 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! initialise prognostic aerosol profiles:                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do i=1,n_mode
-            ! zeroth moment:
-            q(:,(i-1)*3+2)=n_aer1(i) 
-            ! surface area: 2nd moment x pi:
-            q(:,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
-            ! mass: 3rd moment x pi/6*rho:
-            q(:,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
-                ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
-                 
-        enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! use linear interpolation to put sounding on grid:
+		do k=1,kp
+		
+		
+		    if(aero_prof_flag) then
+                iloc=locate(z_read(1:n_levels_s),z(k))
+                iloc=min(n_levels_s-1,iloc)
+                iloc=max(1,iloc)
+                do i=1,n_mode
+                    ! linear interp n_aer
+                    call polint(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    n_aer1(i)=var
+                    ! linear interp sig_aer
+                    call polint(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    sig_aer1(i)=var
+                    ! linear interp d_aer
+                    call polint(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    d_aer1(i)=var
+                enddo
+            endif 
+            
+                        
+            do i=1,n_mode
+                ! zeroth moment:
+                q(k,(i-1)*3+2)=n_aer1(i) 
+                ! surface area: 2nd moment x pi:
+                q(k,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
+                ! mass: 3rd moment x pi/6*rho:
+                q(k,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
+                    ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
 
-
-
-        
-        
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! 1. find the critical diameter of each aerosol mode, and                        !
-        ! 2. perform integration to set the aerosol n,s,m, in cloud water                !                         !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do k=1,kp
+            enddo
+            
+            
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! 1. find the critical diameter of each aerosol mode, and                    !
+            ! 2. perform integration to set the aerosol n,s,m, in cloud water            !                         
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! initialise aerosol in cloud water    
             !  
             if(q(k,(n_mode-1)*3+5) .gt. 0._sp) then 
@@ -380,6 +446,11 @@
 
 
         
+        
+
+
+
+        
 
         deallocate(act_frac1)
         deallocate(dcrit)
@@ -393,13 +464,14 @@
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
 	!>initialises aerosol profile
+	!>@param[in] aero_prof_flag
 	!>@param[in] nq, ncat: number of q variables, categories
 	!>@param[in] c_s, c_e: start and end pointers for categories
 	!>@param[in] inc: pointer to drop number category
 	!>@param[in] ip, kp, o_halo: number of i, k and halo points
 	!>@param[in] x,z,rho, p, t: grid values
 	!>@param[inout] q, q_old: q_variables
-    subroutine p_initialise_aerosol(nq,ncat,c_s,c_e, &
+    subroutine p_initialise_aerosol(aero_prof_flag, nq,ncat,c_s,c_e, &
                 inc, ip,kp,o_halo, x,z,rho,p,t,q,q_old)
                 
         use bam, only : n_mode, n_sv, n_aer1, d_aer1, sig_aer1, density_core1, &
@@ -408,6 +480,7 @@
                     initialise_arrays, ctmm_activation,find_d_and_s_crits
         implicit none
         ! arguments:
+        logical :: aero_prof_flag
         integer(i4b), intent(in) :: nq, ncat, inc, ip, kp, o_halo
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
         real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x
@@ -418,8 +491,8 @@
             intent(inout) :: q, q_old
 
         ! local variables
-        integer(i4b) :: i, k, AllocateStatus
-        real(sp) :: w, smax, phi, xx, kmom
+        integer(i4b) :: i, k, AllocateStatus, iloc
+        real(sp) :: w, smax, phi, xx, kmom, var, dummy
         real(sp), dimension(:), allocatable :: act_frac1 , dcrit
          
         
@@ -431,27 +504,48 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! initialise prognostic aerosol profiles:                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do i=1,n_mode
-            ! zeroth moment:
-            q(:,:,(i-1)*3+2)=n_aer1(i) 
-            ! surface area: 2nd moment x pi:
-            q(:,:,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
-            ! mass: 3rd moment x pi/6*rho:
-            q(:,:,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
-                ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
-                 
-        enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! use linear interpolation to put sounding on grid:
+		do k=1,kp
+		
+		
+		    if(aero_prof_flag) then
+                iloc=locate(z_read(1:n_levels_s),z(k))
+                iloc=min(n_levels_s-1,iloc)
+                iloc=max(1,iloc)
+                do i=1,n_mode
+                    ! linear interp n_aer
+                    call polint(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    n_aer1(i)=var
+                    ! linear interp sig_aer
+                    call polint(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    sig_aer1(i)=var
+                    ! linear interp d_aer
+                    call polint(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    d_aer1(i)=var
+                enddo
+            endif 
+            
+                        
+            do i=1,n_mode
+                ! zeroth moment:
+                q(k,:,(i-1)*3+2)=n_aer1(i) 
+                ! surface area: 2nd moment x pi:
+                q(k,:,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
+                ! mass: 3rd moment x pi/6*rho:
+                q(k,:,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
+                    ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
 
-
-
-        
-        
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! 1. find the critical diameter of each aerosol mode, and                        !
-        ! 2. perform integration to set the aerosol n,s,m, in cloud water                !                         !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do k=1,kp
+            enddo
+            
+            
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! 1. find the critical diameter of each aerosol mode, and                    !
+            ! 2. perform integration to set the aerosol n,s,m, in cloud water            !                         
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! initialise aerosol in cloud water    
             !  
             if(q(k,1,(n_mode-1)*3+5) .gt. 0._sp) then 
@@ -488,6 +582,8 @@
             endif
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 
 
 
