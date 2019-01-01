@@ -103,7 +103,7 @@
     real(sp), intent(in) :: w_peak, z_offset
 
     ! local variables
-    integer(i4b) :: nt, i, j, l,nsteps, iter
+    integer(i4b) :: nt, i, j, l,m,nsteps, iter
     real(sp) :: time
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: rhoa
 
@@ -228,23 +228,35 @@
         if(viscous_dissipation) then
             call smagorinsky(ip,kp,o_halo,cvis,u,w,vis,dx,dz)
             do l=1,5
+                call set_halos_2d(ip,kp,o_halo,theta)  
+                do j=1,nq
+                    call set_halos_2d(ip,kp,o_halo,q(:,:,j))
+                enddo
                 ! set previous values (for dissipation)
                 qold=q
                 th_old=theta
-                call dissipation(ip,kp,o_halo,dt,0.5_sp*(theta+th_old),delsq,dx,dz)
+!                call dissipation(ip,kp,o_halo,dt,0.5_sp*(theta+th_old),delsq,dx,dz)
+                call dissipation(ip,kp,o_halo,dt,theta,delsq,dx,dz)
                 theta(1:kp,1:ip)=theta(1:kp,1:ip)+dt/5._sp*delsq*vis
-                do j=1,nq
-                    call dissipation(ip,kp,o_halo,dt,0.5_sp*(q(:,:,j)+qold(:,:,j)), &
-                        delsq,dx,dz)
-                    q(1:kp,1:ip,j)=q(1:kp,1:ip,j)+dt/5._sp*delsq*vis
-                enddo
+                if(microphysics_flag.le.3) then
+                    do j=1,nq
+						call set_halos_2d(ip,kp,o_halo,q(:,:,j))        
+!                         call dissipation(ip,kp,o_halo,dt,0.5_sp*(q(:,:,j)+qold(:,:,j)), &
+!                             delsq,dx,dz)
+                        call dissipation(ip,kp,o_halo,dt,q(:,:,j), &
+                            delsq,dx,dz)
+                        q(1:kp,1:ip,j)=q(1:kp,1:ip,j)+dt/5._sp*&
+                            delsq(1:kp,1:ip)*vis(1:kp,1:ip)
+                    enddo
+                endif            
                 
-                
-                if(microphysics_flag .eq. 2) then
+                if((microphysics_flag .eq. 2).or.(microphysics_flag .eq. 3)) then
                     ! inhomogeneous mixing assumption:
-                    q(4,1:kp,1:ip)=min(max(qold(1:kp,1:ip,4)* &
-                        (q(1:kp,1:ip,2)/qold(1:kp,1:ip,2)+1.e-15_sp),0._sp), &
-                         q(1:kp,1:ip,4))
+                    q(1:kp,1:ip,inc)=&
+                        min(max( qold(1:kp,1:ip,inc)* &
+                        (q(1:kp,1:ip,iqc)/qold(1:kp,1:ip,iqc)+1.e-15_sp),0._sp), &
+                         q(1:kp,1:ip,inc))
+                    ! add the aerosol in cloud water to aerosol
                 endif
                 
                 th_old=theta

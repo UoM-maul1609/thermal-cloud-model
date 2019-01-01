@@ -18,7 +18,8 @@
             integer(i4b) :: n_levels,nq,ncat, nprec, &
                             iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
                             cat_c, cat_r
-            real(sp) :: dx,dz, dt
+            real(sp) :: dx,dz, dt, &
+                zbase,ztop
             real(sp), dimension(:,:,:), allocatable :: q, qold, precip
             real(sp), dimension(:,:), allocatable :: theta, th_old, &
                 p, rho, t, u, w,delsq, vis
@@ -68,7 +69,9 @@
         logical :: micro_init=.true., adiabatic_prof=.false.
         real(sp) :: adiabatic_frac
         logical :: monotone=.true.,viscous_dissipation=.false.,theta_flag=.false., &
-        			hm_flag=.true., aero_prof_flag=.true.
+        			hm_flag=.true., aero_prof_flag=.true., &
+        			adjust_thermal_flag=.false., &
+        			offset_equal_zbase=.false.
 		integer(i4b) :: advection_scheme=0,microphysics_flag=0, above_cloud=0
 		character (len=200) :: bam_nmlfile = ' '
 		character (len=200) :: aero_nmlfile = ' '

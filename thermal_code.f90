@@ -4,8 +4,9 @@
 	!>drivers and physics code for the thermal cloud model
     module thermal
     use nrtype
+    use nr, only : zbrent
     private
-    public :: thermal_2d, fd_thermal_2d
+    public :: thermal_2d, fd_thermal_2d, adjust_thermal
     
     
 	! variables for thermal properties
@@ -13,8 +14,72 @@
     real(sp), parameter :: Md=29.e-3_sp,Mv=18.e-3_sp,grav=9.81_sp,cp=1005._sp, &
     					lv=2.5e6_sp,ttr=273.15_sp, small1=1.e-30_sp
 	real(sp) :: zc,beta1=Md/Mv-1._sp, alpha1=1./ttr, klarge, z_bar, k1,cell_size
+	real(sp) :: ztop1, del_gamma_mac1,dsm_by_dz_z_eq_zc1,b1,del_c_s1,del_c_t1
 	complex(sp) :: n_bar_mac
     contains
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>adjusts the thermal so it is consistent with cloud base and top temperatures
+	!>@param[in] k
+	!>@param[in] dsm_by_dz_z_eq_zc
+	!>@param[in] b
+	!>@param[in] del_gamma_mac
+	!>@param[in] del_c_s
+	!>@param[in] del_c_t
+	!>@param[in] epsilon_therm
+	!>@param[in] z_offset
+	!>@param[in]  zbase,ztop
+	!>@param[in] offset_equal_zbase
+    subroutine adjust_thermal(k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
+    						epsilon_therm,z_offset, zbase,ztop,offset_equal_zbase)
+        use nrtype
+    
+        implicit none
+        real(sp), intent(inout) :: k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
+                                epsilon_therm,z_offset
+        real(sp), intent(in) :: ztop, zbase
+        logical, intent(in) :: offset_equal_zbase
+    
+        del_gamma_mac1=del_gamma_mac
+        dsm_by_dz_z_eq_zc1=dsm_by_dz_z_eq_zc
+        b1=b
+        del_c_t1=del_c_t
+        del_c_s1=del_c_s
+        dsm_by_dz_z_eq_zc1=dsm_by_dz_z_eq_zc
+        if(offset_equal_zbase) z_offset=zbase
+        ztop1=ztop-z_offset
+        ! equation 32:
+        n_bar_mac=grav*(alpha1*del_gamma_mac1+beta1*(dsm_by_dz_z_eq_zc1+b1))
+        n_bar_mac=sqrt(n_bar_mac)
+        ! equation 33:
+        z_bar=(alpha1*del_c_t1+beta1*del_c_s1)/ &
+            (alpha1*del_gamma_mac1+beta1*(dsm_by_dz_z_eq_zc1+b1))
+
+        epsilon_therm=zbrent(calc_therm_height,1.e-30_sp,1._sp,1.e-20_sp)
+
+        
+    end subroutine adjust_thermal
+    
+    function calc_therm_height(epsilon1)
+        use nrtype
+        implicit none
+        real(sp), intent(in) :: epsilon1
+        real(sp) :: calc_therm_height,delta_z
+        
+        klarge=epsilon1*cp/lv
+
+        k1=0.5_sp*(alpha1*epsilon1-beta1*klarge)/ &
+            (alpha1*del_gamma_mac1+beta1*(dsm_by_dz_z_eq_zc1+b1))
+        
+        
+        
+        delta_z=3._sp/(4._sp*k1)*(1._sp+sqrt(1._sp+16._sp/3._sp*k1*z_bar))
+
+        calc_therm_height=delta_z-ztop1
+	end function calc_therm_height 
+    
+    
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -60,7 +125,7 @@
 
     ! calculate the thermal properties
 	if(therm_init) then
-		zc=zn(1)-z_offset !0._sp !500._sp
+		zc=zn(2)-z_offset !0._sp !500._sp
 		alpha1=1._sp/ttr
 		!k=2.e-3_sp                      ! changes the width
 		!dsm_by_dz_z_eq_zc=-1.6e-6_sp    ! 
@@ -97,15 +162,15 @@
 			! equation 42 of ZZRA:
 ! 			phi=zz*xx
 			! u and w winds
-				zc=zn(1) !-z_offset
+				zc=zn(2) !-z_offset
 				test3=((z(j)-z_offset)-zc)
 				test1=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 				test1=-n_bar_mac/k*(z_bar+test3-k1*test3**2)/sqrt(test1) &
-						*sin(k*xn(i))
+						*sin(k*xn(i+1))
 									
-				zc=zn(1) !-z_offset
-				test3=((zn(j)-z_offset)-zc)
+				zc=zn(2) !-z_offset
+				test3=((zn(j+1)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 
@@ -118,8 +183,8 @@
 ! 				u(j,i)=u(j,i)-imag(test1)
 ! 				w(j,i)=w(j,i)-imag(test2)
 				! w on centred points
-				zc=zn(1) !-z_offset
-				test3=((z(j)-z_offset)-zc)
+				zc=zn(2) !-z_offset
+				test3=((zn(j+1)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 				test2=n_bar_mac* sqrt(test2) *cos(k*(x(i)))
@@ -135,15 +200,18 @@
 	enddo	
 	! calculate u via finite difference
 	wcen(0,:)=wcen(1,:)
+
+
+
 	u=0._sp
 	w=0._sp
-	
+	u(1:kp,0)=(wcen(1:kp,1)-wcen(0:kp-1,1))*dx/dz
 	do i=1,ip
 		u(1:kp,i)=u(1:kp,i-1)-(wcen(1:kp,i)-wcen(0:kp-1,i))*dx/dz
 	enddo
 	w(1:kp,1:ip)=(wcen(1:kp,1:ip))
-! 	u(1,:)=0._sp
-! 	w(1,:)=0._sp
+    u(1,:)=0._sp
+    w(1,:)=0._sp
 	! halos
 	u(1:kp,-o_halo+1:0)=u(1:kp,ip-o_halo+1:ip)
  	u(1:kp,ip+1:ip+o_halo)=u(1:kp,1:o_halo)

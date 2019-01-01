@@ -78,6 +78,7 @@
 	!>@param[in] ice_init: flag to initialise ice crystals in model
 	!>@param[in] number conc of ice crystals #/kg
 	!>@param[in] mass of a single ice crystal kg.
+	!>@param[inout] zbase, ztop
 	!>@param[in] microphysics_flag: flag for kind of microphysics used
 	!>@param[in] above_cloud: flag for assumption above cloud
     subroutine calc_profile_2d(nq,nprec,n_levels,psurf,tsurf,t_cbase, &
@@ -89,6 +90,7 @@
                              delsq, vis, &
                              drop_num_init, num_drop, &
                              ice_init, num_ice, mass_ice, &
+                             zbase,ztop, &
                              microphysics_flag, above_cloud)
     use nrtype
     use nr, only : locate, polint, rkqs, odeint, zbrent
@@ -109,6 +111,7 @@
     real(sp), intent(in) :: adiabatic_frac
     real(sp), intent(in) :: num_drop, num_ice, mass_ice
     ! inouts
+    real(sp), intent(inout) :: zbase, ztop
     real(sp), dimension(:,:), allocatable, intent(inout) :: theta, th_old, &
                                                      p, t, rho,u, w,delsq, &
                                                             vis
@@ -164,11 +167,11 @@
  	precip=0._sp
     ! set up vertical level array
     z=dz*(/(i,i=-o_halo,kp+o_halo-1)/)
-    zn=z+0.5_sp*dz
+    zn=z-0.5_sp*dz
     ! set up horizontal level array
     x=dx*(/(i,i=-o_halo,ip+o_halo-1)/)!-0.5_sp*dx
-    x=x+0.5_sp*dx
-    xn=x+0.5_sp*dx
+    x=x-0.5_sp*dx
+    xn=x-0.5_sp*dx
     dx2=dx
     dz2=dz
     
@@ -184,6 +187,7 @@
 		eps2=1.e-5_sp
 		call odeint(z1,p1,p2,eps2,htry,hmin,hydrostatic1,rkqs)
 		p1=p2 ! p1 is the cloud-base pressure, z1 is the cb height
+		zbase=z1(1)-dz
 		
 		! integrate going downwards - dry adiabatic layer
 		p(1,:)=psurf
@@ -267,6 +271,7 @@
 			if(t(i+1,1).lt.t_ctop) exit
 		enddo
 		istore2=i-1
+		ztop=z(istore2) !(z(istore2-1)+z(istore2))*0.5_sp
 		do i=istore,istore2
 			q(i,:,iqv)=eps1*svp_liq(t(i,1))/ &
 								(p(i,1)-svp_liq(t(i,1)))

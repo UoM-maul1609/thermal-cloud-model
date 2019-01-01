@@ -313,11 +313,12 @@
 		implicit none
 		integer(i4b), intent(in) :: ip,kp,o_halo
 		real(sp), intent(in) :: dt,dx,dz
-		real(sp), intent(in), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
+		real(sp), intent(inout), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
 																				f
 		real(sp), intent(inout), dimension(1:kp,1:ip) :: delsq
 
-			
+		f(0,:)=f(1,:)
+		f(kp+1,:)=f(kp,:)
 		
 		
 		! calculate del^2 using 2nd order difference 

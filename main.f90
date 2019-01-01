@@ -27,6 +27,7 @@
         use initialisation
         use drivers
         use micro_module, only : set_qnames
+        use thermal, only : adjust_thermal
         use w_micro_module, only : read_in_wmm_bam_namelist
         use p_micro_module, only : read_in_pamm_bam_namelist, p_initialise_aerosol
         
@@ -53,7 +54,8 @@
         			
         ! define namelist for thermal
         namelist /thermal_vars/ k, dsm_by_dz_z_eq_zc, b, del_gamma_mac, &
- 					del_c_s, del_c_t, epsilon_therm, w_peak, z_offset
+ 					del_c_s, del_c_t, epsilon_therm, w_peak, z_offset, &
+ 					adjust_thermal_flag, offset_equal_zbase
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -107,7 +109,7 @@
 
 
 
-
+        k=2.*pi/((real(ip,sp))*dx)
 
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -126,10 +128,25 @@
                             grid1%z,grid1%zn,grid1%t,grid1%rho,grid1%u,grid1%w, &
                             grid1%delsq,grid1%vis, &
                             drop_num_init, num_drop, ice_init, num_ice, mass_ice, &
+                            grid1%zbase,grid1%ztop, &
                             microphysics_flag, above_cloud)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! adjust thermal properties?                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(adjust_thermal_flag.and.adiabatic_prof) then
         
+            call adjust_thermal(k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,&
+                                del_c_s,del_c_t,epsilon_therm, &
+                                z_offset, grid1%zbase,grid1%ztop, &
+                                offset_equal_zbase)
+        endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! initialise aerosol for microphysics_flag==3                          !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
