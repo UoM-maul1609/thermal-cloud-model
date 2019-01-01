@@ -552,6 +552,7 @@
 
                 
                 call find_d_and_s_crits(p(k,1),t(k,1),q(k,1,(n_mode-1)*3+5),w,smax,dcrit)
+                q(k,:,(n_mode-1)*3+5)=q(k,1,(n_mode-1)*3+5)
                 ! dcrit is set now
                 ! partial moments of a lognormal distribution:
                 ! see:
@@ -934,6 +935,8 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! zero arrays                                                                        !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    vqr=0._sp
+    vqc=0._sp
 	pgaci=0._sp
 	pgacr=0._sp
 	pgacs=0._sp
@@ -1246,6 +1249,8 @@
     q(1:kp,inc)=q(1:kp,inc)-min(-(rcwaut+rcwacr+rcwsel)*dt/q(1:kp,inc),1._sp)* &
                             q(1:kp,inc)
         
+        
+    rho=1._sp ! fudge for advection conservation
     do k=-o_halo+1,kp+o_halo
         if(q(k,iqc) .lt. qsmall) then
             do i=1,n_mode
