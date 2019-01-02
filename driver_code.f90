@@ -91,7 +91,8 @@
     real(sp), dimension(-o_halo+1:ip+o_halo), intent(inout) :: x,xn, dx2
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
                                     theta, th_old, p, t,rho,u,w
-    real(sp), dimension(1:kp,1:ip), intent(inout) :: delsq, vis
+    real(sp), dimension(1:kp,1:ip), intent(inout) :: delsq
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: vis
     logical, intent(inout) :: new_file, micro_init,therm_init
     logical, intent(in) :: monotone,hm_flag,theta_flag, viscous_dissipation
     integer(i4b), intent(in) :: microphysics_flag
@@ -227,6 +228,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(viscous_dissipation) then
             call smagorinsky(ip,kp,o_halo,cvis,u,w,vis,dx,dz)
+            call set_halos_2d(ip,kp,o_halo,vis)
             do l=1,5
                 call set_halos_2d(ip,kp,o_halo,theta)  
                 do j=1,nq
@@ -236,17 +238,17 @@
                 qold=q
                 th_old=theta
 !                call dissipation(ip,kp,o_halo,dt,0.5_sp*(theta+th_old),delsq,dx,dz)
-                call dissipation(ip,kp,o_halo,dt,theta,delsq,dx,dz)
-                theta(1:kp,1:ip)=theta(1:kp,1:ip)+dt/5._sp*delsq*vis
+                call dissipation(ip,kp,o_halo,dt,theta,delsq,vis,dx,dz)
+                theta(1:kp,1:ip)=theta(1:kp,1:ip)+dt/5._sp*delsq
                 if(microphysics_flag.le.3) then
                     do j=1,nq
 						call set_halos_2d(ip,kp,o_halo,q(:,:,j))        
 !                         call dissipation(ip,kp,o_halo,dt,0.5_sp*(q(:,:,j)+qold(:,:,j)), &
 !                             delsq,dx,dz)
                         call dissipation(ip,kp,o_halo,dt,q(:,:,j), &
-                            delsq,dx,dz)
+                            delsq,vis,dx,dz)
                         q(1:kp,1:ip,j)=q(1:kp,1:ip,j)+dt/5._sp*&
-                            delsq(1:kp,1:ip)*vis(1:kp,1:ip)
+                            delsq(1:kp,1:ip)
                     enddo
                 endif            
                 

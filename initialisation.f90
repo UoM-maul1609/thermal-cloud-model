@@ -160,7 +160,7 @@
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( delsq(1:kp,1:ip), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
-    allocate( vis(1:kp,1:ip), STAT = AllocateStatus)
+    allocate( vis(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 
 

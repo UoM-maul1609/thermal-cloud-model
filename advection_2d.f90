@@ -303,31 +303,43 @@
 	!>@param[in] dt:  timestep
 	!>@param[in] f: prognostic variable
 	!>@param[inout] delsq: delsq of f
+	!>@param[in] vis: viscosity
 	!>@param[in] dx,dz: grid spacing
 	!>calculates del**2:
 	!>\f$ visterm = \frac{\partial ^2}{\partial x^2} f + 
 	!> \frac{\partial ^2}{\partial z^2} f \f$
-    subroutine dissipation(ip,kp,o_halo,dt,f,delsq,dx,dz)
+    subroutine dissipation(ip,kp,o_halo,dt,f,delsq,vis,dx,dz)
 
 		use nrtype
 		implicit none
 		integer(i4b), intent(in) :: ip,kp,o_halo
 		real(sp), intent(in) :: dt,dx,dz
 		real(sp), intent(inout), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
-																				f
+																				f, vis
 		real(sp), intent(inout), dimension(1:kp,1:ip) :: delsq
+		
+		real(sp), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: f2
 
 		f(0,:)=f(1,:)
 		f(kp+1,:)=f(kp,:)
 		
+		f2=f
+		
 		
 		! calculate del^2 using 2nd order difference 
 		! (central difference of forward and backward):
-		delsq(1:kp,1:ip)  =(f(1:kp,2:ip+1)-2._sp*f(1:kp,1:ip)+f(1:kp,0:ip-1))/dx**2 
-			  
-		delsq(1:kp,1:ip)  = delsq(1:kp,1:ip) + &
-		    (f(2:kp+1,1:ip)-2._sp*f(1:kp,1:ip)+f(0:kp-1,1:ip))/dz**2 
-
+! 		delsq(1:kp,1:ip)  =(f2(1:kp,2:ip+1)-2._sp*f2(1:kp,1:ip)+f2(1:kp,0:ip-1))/dx**2 
+! 			  
+! 		delsq(1:kp,1:ip)  = delsq(1:kp,1:ip) + &
+! 		    (f2(2:kp+1,1:ip)-2._sp*f2(1:kp,1:ip)+f2(0:kp-1,1:ip))/dz**2 
+!         delsq=delsq*vis(1:kp,1:ip)
+        
+        
+        delsq(1:kp,1:ip)=(vis(1:kp,1:ip)*(f2(1:kp,2:ip+1)-f2(1:kp,1:ip))/dx- &
+                        vis(1:kp,0:ip-1)*(f2(1:kp,1:ip)-f2(1:kp,0:ip-1))/dx)/dx
+        delsq(1:kp,1:ip)=delsq(1:kp,1:ip) + &
+                        (vis(1:kp,1:ip)*(f2(2:kp+1,1:ip)-f2(1:kp,1:ip))/dz- &
+                        vis(0:kp-1,1:ip)*(f2(1:kp,1:ip)-f2(0:kp-1,1:ip))/dz)/dz
 	end subroutine dissipation
 
 	
@@ -353,18 +365,41 @@
 		real(sp), intent(in) :: cvis, dx, dz
 		real(sp), intent(in), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
 																		u,w
-		real(sp), intent(inout), dimension(1:kp,1:ip) :: vis
+		real(sp), intent(inout), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: vis
 		! local variables:
-		integer(i4b) :: j, i
+		integer(i4b) :: j, i,k
+		real(sp), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: strain
 			
 		
 		
 		! calculate viscosity using centred differences:
-		vis(1:kp,1:ip) = cvis**2._sp*dx*dz* &
-		sqrt( ( (u(1:kp,2:ip+1)-u(1:kp,0:ip-1))/ dx )**2 + &
-			( (w(2:kp+1,1:ip)-w(0:kp-1,1:ip))/ dz )**2 + &
-			0.5_sp*( (u(2:kp+1,1:ip)-u(0:kp-1,1:ip))/ dz+ &
-			(w(1:kp,2:ip+1)-w(1:kp,0:ip-1))/ dx )**2 )
+! 		vis(1:kp,1:ip) = cvis**2._sp*dx*dz* &
+!                sqrt( ( (u(1:kp,2:ip+1)-u(1:kp,0:ip-1))/ dx )**2 + &
+!                        ( (w(2:kp+1,1:ip)-w(0:kp-1,1:ip))/ dz )**2 + &
+!                        0.5_sp*( (u(2:kp+1,1:ip)-u(0:kp-1,1:ip))/ dz+ &
+!                        (w(1:kp,2:ip+1)-w(1:kp,0:ip-1))/ dx )**2 )
+
+        strain=0._sp
+        do i=1,ip
+            do k=1,kp
+                ! 2*s11*s11
+                strain(k,i)=((u(k+1,i)-u(k+1,i-1))/dx)**2 + &
+                              ((u(k,i)-u(k,i-1))/dx)**2
+                ! 2*s33*s33
+                strain(k,i)=strain(k,i)+ &
+                              ((w(k,i)-w(k-1,i))/dz)**2 + &
+                              ((w(k+1,i)-w(k,i))/dz)**2 
+                      
+                ! 2*s13*s13 - du/dz+dw/dx - averaging over 2 points
+                strain(k,i)=strain(k,i)+ 0.5_sp * &
+                   (((u(k+1,i)-u(k,i))/dz+(w(k,i+1)-w(k,i))/dx)**2 + &
+                   ((u(k+1,i-1)-u(k,i-1))/dz+(w(k,i)-w(k,i-1))/dx)**2)
+            enddo
+        enddo
+        
+        
+        vis(1:kp,1:ip) = cvis**2*dx*dz*&
+                        sqrt( 0.5_sp*(strain(1:kp,1:ip)+strain(0:kp-1,1:ip)) )
 
 	end subroutine smagorinsky
 		
