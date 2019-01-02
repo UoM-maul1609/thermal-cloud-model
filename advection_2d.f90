@@ -300,12 +300,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
             
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 			
 		endif
 		
@@ -404,22 +404,22 @@
             beta_i_up(:,-l_h+1:0)       =beta_i_up(:,ip-l_h+1:ip)
             beta_i_up(:,ip+1:ip+r_h)    =beta_i_up(:,1:r_h)
             beta_i_up(0,:)=0._sp
-            beta_i_up(kp,:)=0._sp
+            beta_i_up(kp+1,:)=0._sp
             
             beta_i_down(:,-l_h+1:0)     =beta_i_down(:,ip-l_h+1:ip)
             beta_i_down(:,ip+1:ip+r_h)  =beta_i_down(:,1:r_h)
             beta_i_down(0,:)=0._sp
-            beta_i_down(kp,:)=0._sp
+            beta_i_down(kp+1,:)=0._sp
             
             beta_k_up(:,-l_h+1:0)       =beta_k_up(:,ip-l_h+1:ip)
             beta_k_up(:,ip+1:ip+r_h)    =beta_k_up(:,1:r_h)
             beta_k_up(0,:)=0._sp
-            beta_k_up(kp,:)=0._sp
+            beta_k_up(kp+1,:)=0._sp
             
             beta_k_down(:,-l_h+1:0)     =beta_k_down(:,ip-l_h+1:ip)
             beta_k_down(:,ip+1:ip+r_h)  =beta_k_down(:,1:r_h)
             beta_k_down(0,:)=0._sp
-            beta_k_down(kp,:)=0._sp
+            beta_k_down(kp+1,:)=0._sp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -458,12 +458,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
             
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -749,12 +749,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
 
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 			
 		endif
 		
@@ -852,22 +852,22 @@
             beta_i_up(:,-l_h+1:0)       =beta_i_up(:,ip-l_h+1:ip)
             beta_i_up(:,ip+1:ip+r_h)    =beta_i_up(:,1:r_h)
             beta_i_up(0,:)=0._sp
-            beta_i_up(kp,:)=0._sp
+            beta_i_up(kp+1,:)=0._sp
             
             beta_i_down(:,-l_h+1:0)     =beta_i_down(:,ip-l_h+1:ip)
             beta_i_down(:,ip+1:ip+r_h)  =beta_i_down(:,1:r_h)
             beta_i_down(0,:)=0._sp
-            beta_i_down(kp,:)=0._sp
+            beta_i_down(kp+1,:)=0._sp
             
             beta_k_up(:,-l_h+1:0)       =beta_k_up(:,ip-l_h+1:ip)
             beta_k_up(:,ip+1:ip+r_h)    =beta_k_up(:,1:r_h)
             beta_k_up(0,:)=0._sp
-            beta_k_up(kp,:)=0._sp
+            beta_k_up(kp+1,:)=0._sp
             
             beta_k_down(:,-l_h+1:0)     =beta_k_down(:,ip-l_h+1:ip)
             beta_k_down(:,ip+1:ip+r_h)  =beta_k_down(:,1:r_h)
             beta_k_down(0,:)=0._sp
-            beta_k_down(kp,:)=0._sp
+            beta_k_down(kp+1,:)=0._sp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -907,12 +907,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
 
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 
 
 		endif
