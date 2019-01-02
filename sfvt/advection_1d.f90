@@ -7,7 +7,8 @@
     
     private
     public :: mpdata_1d, mpdata_vec_1d, first_order_upstream_1d
-    
+    real(sp), parameter :: small=1e-60_sp
+			
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! Simple first order upstream scheme                                                 !
@@ -18,11 +19,11 @@
 	!>perform 1 time-step of 1-d first order upstream method 
 	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
 	!>@param[in] dt
-	!>@param[in] dz
+	!>@param[in] dzn, rhoa, rhoan
 	!>@param[in] kp,l_h,r_h
 	!>@param[in] w
 	!>@param[inout] psi
-	subroutine first_order_upstream_1d(dt,dz,rhoa,kp,l_h,r_h,w,psi)
+	subroutine first_order_upstream_1d(dt,dzn,rhoa,rhoan, kp,l_h,r_h,w,psi)
 	use nrtype
 	implicit none
 	real(sp), intent(in) :: dt
@@ -31,7 +32,7 @@
 		intent(in) :: w
 	real(sp), dimension(-r_h+1:kp+r_h), &
 		intent(inout) :: psi
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, rhoa
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
 	
 	! locals
 	real(sp), dimension(kp) :: fz_r, fz_l
@@ -40,12 +41,12 @@
 !$omp simd	
     do k=1,kp
         fz_r(k)=( (w(k)+abs(w(k)))*rhoa(k)*psi(k)+ &
-            (w(k)-abs(w(k)))*rhoa(k+1)*psi(k+1) )*dt/ &
-            (2._sp*dz(k)*rhoa(k))
+            (w(k)-abs(w(k)))*rhoan(k+1)*psi(k+1) )*dt/ &
+            (2._sp*dzn(k)*rhoa(k))
 
         fz_l(k)=( (w(k-1)+abs(w(k-1)))*rhoa(k-1)*psi(k-1)+ &
-            (w(k-1)-abs(w(k-1)))*rhoa(k)*psi(k) )*dt/ &
-            (2._sp*dz(k)*rhoa(k))
+            (w(k-1)-abs(w(k-1)))*rhoan(k)*psi(k) )*dt/ &
+            (2._sp*dzn(k)*rhoa(k))
     enddo
 !$omp end simd
 	
@@ -69,20 +70,22 @@
 	!>solves the 1-d advection equation:
 	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
 	!>@param[in] dt
-	!>@param[in] dz, dzn
+	!>@param[in] dz, dzn, rhoa, rhoan
 	!>@param[in] kp,l_h,r_h
 	!>@param[in] w
 	!>@param[inout] psi
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] boundary_cond
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #ifdef MPI
 	subroutine mpdata_1d(dt,dz,dzn,&
-						rhoa,kp,l_h,r_h,w,psi_in,kord,monotone, comm3d, id, &
+						rhoa,rhoan,kp,l_h,r_h,w,psi_in,kord,monotone, &
+						boundary_cond,comm3d, id, &
 						dims,coords)
 #else
 	subroutine mpdata_1d(dt,dz,dzn,&
-						rhoa,kp,l_h,r_h,w,psi_in,kord,monotone)
+						rhoa,rhoan,kp,l_h,r_h,w,psi_in,kord,monotone, boundary_cond)
 #endif
 	use nrtype
 #ifdef MPI
@@ -101,12 +104,12 @@
 		intent(in), target :: w
 	real(sp), dimension(-r_h+1:kp+r_h), &
 		intent(inout), target :: psi_in
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa,rhoan
 	logical :: monotone
+	integer(i4b), intent(in) :: boundary_cond
 	
 	! locals
-	real(sp) :: small=1e-15_sp, &
-			u_div3, u_j_bar3, &
+	real(sp) :: u_div3, u_j_bar3, &
 			denom1, denom2, minlocal, minglobal, psi_local_sum, psi_sum
 	integer(i4b) :: i,j,k, it, it2, error
 	real(sp), dimension(:), pointer :: wt
@@ -199,14 +202,14 @@
                 ! w wind:
                 wt_sav(k)=(abs(wt(k))*dz(k)-dt*wt(k)*wt(k) ) * &
                     (psi_old(k+1)-psi_old(k) ) / &
-                    (psi_old(k+1)+psi_old(k)+small) /dz(k) - u_j_bar3
+                    (psi_old(k+1)+psi_old(k)+small) /dzn(k) - u_j_bar3
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! last update of eq 38 smolarkiewicz 1984
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 wt_sav(k)=wt_sav(k) - 0.25_sp*dt*wt(k) * &
-                 ( (wt(k+1)-wt(k-1))/(0.5_sp*(dzn(k-1)+dzn(k)))-u_div3 )
+                 ( (wt(k+1)-wt(k-1))/(dz(k-1))-u_div3 )
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -233,7 +236,7 @@
 !             ut(:,-l_h+1:0)=ut(:,ip-l_h+1:ip)
 !             wt(:,ip+1:ip+r_h)=wt(:,1:r_h)
             wt(0)=wt(1)
-            wt(kp)=wt(kp-1)
+            wt(kp:kp+1)=wt(kp-1)
 			
 		endif
 		
@@ -272,11 +275,11 @@
 !$omp simd	
             do k=1,kp		
                 denom1=(dt*((max(wt(k-1),0._sp)*psi_old(k-1)-&
-                          min(wt(k),0._sp)*psi_old(k+1))/dzn(k-1) &
+                          min(wt(k),0._sp)*psi_old(k+1))/dz(k-1) &
                           +small))
                           
                 denom2=(dt*((max(wt(k),0._sp)*psi_old(k)-&
-                          min(wt(k-1),0._sp)*psi_old(k))/dzn(k-1) &
+                          min(wt(k-1),0._sp)*psi_old(k))/dz(k-1) &
                           +small))
                           
                 beta_k_up(k)=(psi_k_max(k)-psi_old(k)) / denom1
@@ -335,7 +338,7 @@
 !             ut(:,-l_h+1:0)=ut(:,ip-l_h+1:ip)
 !             wt(:,ip+1:ip+r_h)=wt(:,1:r_h)
             wt(0)=wt(1)
-            wt(kp)=wt(kp-1)
+            wt(kp:kp+1)=wt(kp-1)
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -346,7 +349,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! advect using first order upwind                                                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		call first_order_upstream_1d(dt,dz,rhoa,&
+		call first_order_upstream_1d(dt,dzn,rhoa,rhoan,&
 				kp,l_h,r_h,wt,psi_old)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -360,8 +363,17 @@
 ! 									psi_old,dims,coords)
             ! halos
 !             psi_old(:,-l_h+1:0)=psi_old(:,ip-l_h+1:ip)
-            psi_old(0)=0._sp
-            psi_old(kp+1)=0._sp
+            select case(boundary_cond)
+                case(0) ! nothing top and bottom
+                    psi_old(0)=0._sp
+                    psi_old(kp+1)=0._sp
+                case(1) ! same top and bottom
+                    psi_old(0)=psi_old(1)
+                    psi_old(kp+1)=psi_old(kp)                  
+                case default
+                    print *,'no such bc'
+                    stop
+            end select
             
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
 		endif		
@@ -397,7 +409,7 @@
 	!>solves the 1-d advection equation:
 	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
 	!>@param[in] dt
-	!>@param[in] dx,dz, dxn, dyn, dzn
+	!>@param[in] dx,dz, dxn, dyn, dzn, rhoa, rhoan
 	!>@param[in] ip,kp,nq,l_h,r_h
 	!>@param[in] w
 	!>@param[inout] psi
@@ -406,11 +418,11 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #ifdef MPI
 	subroutine mpdata_vec_1d(dt,dz,dzn,&
-						rhoa,kp,nq,l_h,r_h,w,psi_in,kord,monotone, comm3d, id, &
+						rhoa,rhoan,kp,nq,l_h,r_h,w,psi_in,kord,monotone, comm3d, id, &
 						dims,coords)
 #else
 	subroutine mpdata_vec_1d(dt,dz,dzn,&
-						rhoa,kp,nq,l_h,r_h,w,psi_in,kord,monotone)
+						rhoa,rhoan,kp,nq,l_h,r_h,w,psi_in,kord,monotone)
 #endif
 	use nrtype
 #ifdef MPI
@@ -429,12 +441,11 @@
 		intent(in), target :: w
 	real(sp), dimension(-r_h+1:kp+r_h,1:nq), &
 		intent(inout), target :: psi_in
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical :: monotone
 	
 	! locals
-	real(sp) :: small=1.e-15_sp, &
-		    u_div3, u_j_bar3, &
+	real(sp) :: u_div3, u_j_bar3, &
 			denom1, denom2, minlocal, psi_local_sum, psi_sum
 	real(sp), dimension(nq) :: minglobal
 	integer(i4b) :: i,k, it, it2, n,error
@@ -529,14 +540,14 @@
                 ! w wind:
                 wt_sav(k)=(abs(wt(k))*dz(k)-dt*wt(k)*wt(k) ) * &
                     (psi_old(k+1)-psi_old(k) ) / &
-                    (psi_old(k+1)+psi_old(k)+small) /dz(k) - u_j_bar3
+                    (psi_old(k+1)+psi_old(k)+small) /dzn(k) - u_j_bar3
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! last update of eq 38 smolarkiewicz 1984
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 wt_sav(k)=wt_sav(k) - 0.25_sp*dt*wt(k) * &
-                 ( (wt(k+1)-wt(k-1))/(0.5_sp*(dzn(k-1)+dzn(k)))-u_div3 )
+                 ( (wt(k+1)-wt(k-1))/(dz(k-1))-u_div3 )
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -563,7 +574,7 @@
 !             ut(:,-l_h+1:0)=ut(:,ip-l_h+1:ip)
 !             wt(:,ip+1:ip+r_h)=wt(:,1:r_h)
             wt(0)=wt(1)
-            wt(kp)=wt(kp-1)
+            wt(kp:kp+1)=wt(kp-1)
 			
 		endif
 		
@@ -604,11 +615,11 @@
             do k=1,kp	
                 	
                 denom1=dt*((max(wt(k-1),0._sp)*psi_old(k-1)-&
-                          min(wt(k),0._sp)*psi_old(k+1))/dzn(k-1) &
+                          min(wt(k),0._sp)*psi_old(k+1))/dz(k-1) &
                           +small)
                           
                 denom2=dt*((max(wt(k),0._sp)*psi_old(k)-&
-                          min(wt(k-1),0._sp)*psi_old(k))/dzn(k-1) &
+                          min(wt(k-1),0._sp)*psi_old(k))/dz(k-1) &
                           +small)
                           
 
@@ -666,7 +677,7 @@
 !             ut(:,-l_h+1:0)=ut(:,ip-l_h+1:ip)
 !             wt(:,ip+1:ip+r_h)=wt(:,1:r_h)
             wt(0)=wt(1)
-            wt(kp)=wt(kp-1)
+            wt(kp:kp+1)=wt(kp-1)
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -678,7 +689,7 @@
 		! advect using first order upwind                                                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		do n=1,nq
-            call first_order_upstream_1d(dt,dz,rhoa,&
+            call first_order_upstream_1d(dt,dzn,rhoa,rhoan,&
                     kp,l_h,r_h,wt,psi_in(:,n))
             if((it <= kord) .and. (kord >= 1)) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

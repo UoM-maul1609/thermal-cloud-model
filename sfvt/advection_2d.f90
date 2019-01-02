@@ -7,6 +7,7 @@
     
     private
     public :: mpdata_2d, mpdata_vec_2d, first_order_upstream_2d
+    real(sp), parameter :: small=1e-60_sp
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -18,12 +19,12 @@
 	!>perform 1 time-step of 2-d first order upstream method 
 	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
 	!>@param[in] dt
-	!>@param[in] dx,dz
+	!>@param[in] dxn,dzn, rhoa, rhoan
 	!>@param[in] ip,kp,l_h,r_h
 	!>@param[in] u
 	!>@param[in] w
 	!>@param[inout] psi
-	subroutine first_order_upstream_2d(dt,dx,dz,rhoa,ip,kp,l_h,r_h,u,w,psi)
+	subroutine first_order_upstream_2d(dt,dxn,dzn,rhoa,rhoan,ip,kp,l_h,r_h,u,w,psi)
 	use nrtype
 	implicit none
 	real(sp), intent(in) :: dt
@@ -34,8 +35,8 @@
 		intent(in) :: w
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:ip+r_h), &
 		intent(inout) :: psi
-	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, rhoa
+	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dxn
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
 	
 	! locals
 	real(sp), dimension(kp,ip) :: fx_r, fx_l, fz_r, fz_l
@@ -47,20 +48,20 @@
             ! Flux going out of right cell boundary into adjacent cell-x 
             fx_r(k,i)=( (u(k,i)+abs(u(k,i)))*psi(k,i)+ &
                 (u(k,i)-abs(u(k,i)))*psi(k,i+1) )*dt/ &
-                (2._sp*dx(i))
+                (2._sp*dxn(i))
             ! Flux going through left cell boundary from adjacent cell-x
             fx_l(k,i)=( (u(k,i-1)+abs(u(k,i-1)))*psi(k,i-1)+ &
                 (u(k,i-1)-abs(u(k,i-1)))*psi(k,i) )*dt/ &
-                (2._sp*dx(i))
+                (2._sp*dxn(i))
     
     
             fz_r(k,i)=( (w(k,i)+abs(w(k,i)))*rhoa(k)*psi(k,i)+ &
                 (w(k,i)-abs(w(k,i)))*rhoa(k+1)*psi(k+1,i) )*dt/ &
-                (2._sp*dz(k)*rhoa(k))
+                (2._sp*dzn(k)*rhoa(k))
     
-            fz_l(k,i)=( (w(k-1,i)+abs(w(k-1,i)))*rhoa(k-1)*psi(k-1,i)+ &
-                (w(k-1,i)-abs(w(k-1,i)))*rhoa(k)*psi(k,i) )*dt/ &
-                (2._sp*dz(k)*rhoa(k))
+            fz_l(k,i)=( (w(k-1,i)+abs(w(k-1,i)))*rhoan(k-1)*psi(k-1,i)+ &
+                (w(k-1,i)-abs(w(k-1,i)))*rhoan(k)*psi(k,i) )*dt/ &
+                (2._sp*dzn(k)*rhoa(k))
         enddo
 	enddo
 !$omp end simd
@@ -85,7 +86,7 @@
 	!>solves the 2-d advection equation:
 	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
 	!>@param[in] dt
-	!>@param[in] dx,dz, dxn, dzn
+	!>@param[in] dx,dz, dxn, dzn, rhoa, rhoan
 	!>@param[in] ip,kp,l_h,r_h
 	!>@param[in] u
 	!>@param[in] w
@@ -95,11 +96,11 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #ifdef MPI
 	subroutine mpdata_2d(dt,dx,dz,dxn,dzn,&
-						rhoa,ip,kp,l_h,r_h,u,w,psi_in,kord,monotone, comm3d, id, &
+						rhoa,rhoan, ip,kp,l_h,r_h,u,w,psi_in,kord,monotone, comm3d, id, &
 						dims,coords)
 #else
 	subroutine mpdata_2d(dt,dx,dz,dxn,dzn,&
-						rhoa,ip,kp,l_h,r_h,u,w,psi_in,kord,monotone)
+						rhoa,rhoan, ip,kp,l_h,r_h,u,w,psi_in,kord,monotone)
 #endif
 	use nrtype
 #ifdef MPI
@@ -122,12 +123,11 @@
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:ip+r_h), &
 		intent(inout), target :: psi_in
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical :: monotone
 	
 	! locals
-	real(sp) :: small=1e-15_sp, &
-			u_div1, u_div3, u_j_bar1, u_j_bar3, &
+	real(sp) :: u_div1, u_div3, u_j_bar1, u_j_bar3, &
 			denom1, denom2, minlocal, minglobal, psi_local_sum, psi_sum
 	integer(i4b) :: i,j,k, it, it2, error
 	real(sp), dimension(:,:), pointer :: ut
@@ -206,11 +206,11 @@
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of u wind:
                     u_div1=(wt(k,i)+wt(k,i+1)-wt(k-1,i)-wt(k-1,i+1)) &
-                            / dzn(k-1) 
+                            / dz(k-1) 
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of w wind:
                     u_div3=(ut(k,i)+ut(k+1,i)-ut(k,i-1)-ut(k+1,i-1)) &
-                            / dxn(i-1) 
+                            / dx(i-1) 
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -255,20 +255,20 @@
                     ! u wind:
                     ut_sav(k,i)=(abs(ut(k,i))*dx(i)-dt*ut(k,i)*ut(k,i) ) * &
                         (psi_old(k,i+1)-psi_old(k,i) ) / &
-                        (psi_old(k,i+1)+psi_old(k,i)+small) /dx(i) - u_j_bar1
+                        (psi_old(k,i+1)+psi_old(k,i)+small) /dxn(i) - u_j_bar1
                     ! w wind:
                     wt_sav(k,i)=(abs(wt(k,i))*dz(k)-dt*wt(k,i)*wt(k,i) ) * &
                         (psi_old(k+1,i)-psi_old(k,i) ) / &
-                        (psi_old(k+1,i)+psi_old(k,i)+small) /dz(k) - u_j_bar3
+                        (psi_old(k+1,i)+psi_old(k,i)+small) /dzn(k) - u_j_bar3
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! last update of eq 38 smolarkiewicz 1984
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ut_sav(k,i)=ut_sav(k,i) - 0.25_sp*dt*ut(k,i) * &
-                     ( (ut(k,i+1)-ut(k,i-1))/(0.5_sp*(dxn(i-1)+dxn(i)))-u_div1 )
+                     ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))-u_div1 )
                     wt_sav(k,i)=wt_sav(k,i) - 0.25_sp*dt*wt(k,i) * &
-                     ( (wt(k+1,i)-wt(k-1,i))/(0.5_sp*(dzn(k-1)+dzn(k)))-u_div3 )
+                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))-u_div3 )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -300,12 +300,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
             
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 			
 		endif
 		
@@ -361,15 +361,15 @@
 			do i=1,ip
                 do k=1,kp		
                     denom1=(dt*((max(ut(k,i-1),0._sp)*psi_old(k,i-1)- &
-                              min(ut(k,i),0._sp)*psi_old(k,i+1))/dxn(i-1)+ &
+                              min(ut(k,i),0._sp)*psi_old(k,i+1))/dx(i-1)+ &
                             (max(wt(k-1,i),0._sp)*psi_old(k-1,i)-&
-                              min(wt(k,i),0._sp)*psi_old(k+1,i))/dzn(k-1) &
+                              min(wt(k,i),0._sp)*psi_old(k+1,i))/dz(k-1) &
                               +small))
                               
                     denom2=(dt*((max(ut(k,i),0._sp)*psi_old(k,i)- &
-                              min(ut(k,i-1),0._sp)*psi_old(k,i))/dxn(i-1) + &
+                              min(ut(k,i-1),0._sp)*psi_old(k,i))/dx(i-1) + &
                             (max(wt(k,i),0._sp)*psi_old(k,i)-&
-                              min(wt(k-1,i),0._sp)*psi_old(k,i))/dzn(k-1) &
+                              min(wt(k-1,i),0._sp)*psi_old(k,i))/dz(k-1) &
                               +small))
                               
                     beta_i_up(k,i)=(psi_i_max(k,i)-psi_old(k,i)) / denom1
@@ -404,22 +404,22 @@
             beta_i_up(:,-l_h+1:0)       =beta_i_up(:,ip-l_h+1:ip)
             beta_i_up(:,ip+1:ip+r_h)    =beta_i_up(:,1:r_h)
             beta_i_up(0,:)=0._sp
-            beta_i_up(kp,:)=0._sp
+            beta_i_up(kp+1,:)=0._sp
             
             beta_i_down(:,-l_h+1:0)     =beta_i_down(:,ip-l_h+1:ip)
             beta_i_down(:,ip+1:ip+r_h)  =beta_i_down(:,1:r_h)
             beta_i_down(0,:)=0._sp
-            beta_i_down(kp,:)=0._sp
+            beta_i_down(kp+1,:)=0._sp
             
             beta_k_up(:,-l_h+1:0)       =beta_k_up(:,ip-l_h+1:ip)
             beta_k_up(:,ip+1:ip+r_h)    =beta_k_up(:,1:r_h)
             beta_k_up(0,:)=0._sp
-            beta_k_up(kp,:)=0._sp
+            beta_k_up(kp+1,:)=0._sp
             
             beta_k_down(:,-l_h+1:0)     =beta_k_down(:,ip-l_h+1:ip)
             beta_k_down(:,ip+1:ip+r_h)  =beta_k_down(:,1:r_h)
             beta_k_down(0,:)=0._sp
-            beta_k_down(kp,:)=0._sp
+            beta_k_down(kp+1,:)=0._sp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -458,12 +458,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
             
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -474,7 +474,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! advect using first order upwind                                                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		call first_order_upstream_2d(dt,dx,dz,rhoa,&
+		call first_order_upstream_2d(dt,dxn,dzn,rhoa,rhoan, &
 				ip,kp,l_h,r_h,ut,wt,psi_old)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -527,7 +527,7 @@
 	!>solves the 2-d advection equation:
 	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
 	!>@param[in] dt
-	!>@param[in] dx,dz, dxn, dyn, dzn
+	!>@param[in] dx,dz, dxn, dyn, dzn, rhoa, rhoan
 	!>@param[in] ip,kp,nq,l_h,r_h
 	!>@param[in] u
 	!>@param[in] w
@@ -537,11 +537,13 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #ifdef MPI
 	subroutine mpdata_vec_2d(dt,dx,dz,dxn,dzn,&
-						rhoa,ip,kp,nq,l_h,r_h,u,w,psi_in,kord,monotone, comm3d, id, &
+						rhoa,rhoan, &
+						ip,kp,nq,l_h,r_h,u,w,psi_in,kord,monotone, comm3d, id, &
 						dims,coords)
 #else
 	subroutine mpdata_vec_2d(dt,dx,dz,dxn,dzn,&
-						rhoa,ip,kp,nq,l_h,r_h,u,w,psi_in,kord,monotone)
+						rhoa,rhoan, &
+						ip,kp,nq,l_h,r_h,u,w,psi_in,kord,monotone)
 #endif
 	use nrtype
 #ifdef MPI
@@ -564,12 +566,11 @@
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:ip+r_h,1:nq), &
 		intent(inout), target :: psi_in
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa,rhoan
 	logical :: monotone
 	
 	! locals
-	real(sp) :: small=1e-15_sp, &
-			u_div1, u_div3, u_j_bar1, u_j_bar3, &
+	real(sp) :: u_div1, u_div3, u_j_bar1, u_j_bar3, &
 			denom1, denom2, minlocal, psi_local_sum, psi_sum
 	real(sp), dimension(nq) :: minglobal
 	integer(i4b) :: i,k, it, it2, n,error
@@ -654,11 +655,11 @@
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of u wind:
                     u_div1=(wt(k,i)+wt(k,i+1)-wt(k-1,i)-wt(k-1,i+1)) &
-                            / dzn(k-1) 
+                            / dz(k-1) 
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of w wind:
                     u_div3=(ut(k,i)+ut(k+1,i)-ut(k,i-1)-ut(k+1,i-1)) &
-                            / dxn(i-1) 
+                            / dx(i-1) 
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -703,20 +704,20 @@
                     ! u wind:
                     ut_sav(k,i)=(abs(ut(k,i))*dx(i)-dt*ut(k,i)*ut(k,i) ) * &
                         (psi_old(k,i+1)-psi_old(k,i) ) / &
-                        (psi_old(k,i+1)+psi_old(k,i)+small) /dx(i) - u_j_bar1
+                        (psi_old(k,i+1)+psi_old(k,i)+small) /dxn(i) - u_j_bar1
                     ! w wind:
                     wt_sav(k,i)=(abs(wt(k,i))*dz(k)-dt*wt(k,i)*wt(k,i) ) * &
                         (psi_old(k+1,i)-psi_old(k,i) ) / &
-                        (psi_old(k+1,i)+psi_old(k,i)+small) /dz(k) - u_j_bar3
+                        (psi_old(k+1,i)+psi_old(k,i)+small) /dzn(k) - u_j_bar3
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! last update of eq 38 smolarkiewicz 1984
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ut_sav(k,i)=ut_sav(k,i) - 0.25_sp*dt*ut(k,i) * &
-                     ( (ut(k,i+1)-ut(k,i-1))/(0.5_sp*(dxn(i-1)+dxn(i)))-u_div1 )
+                     ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))-u_div1 )
                     wt_sav(k,i)=wt_sav(k,i) - 0.25_sp*dt*wt(k,i) * &
-                     ( (wt(k+1,i)-wt(k-1,i))/(0.5_sp*(dzn(k-1)+dzn(k)))-u_div3 )
+                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))-u_div3 )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -748,12 +749,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
 
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 			
 		endif
 		
@@ -809,15 +810,15 @@
 			do i=1,ip
                 do k=1,kp		
                     denom1=(dt*((max(ut(k,i-1),0._sp)*psi_old(k,i-1)- &
-                              min(ut(k,i),0._sp)*psi_old(k,i+1))/dxn(i-1)+ &
+                              min(ut(k,i),0._sp)*psi_old(k,i+1))/dx(i-1)+ &
                             (max(wt(k-1,i),0._sp)*psi_old(k-1,i)-&
-                              min(wt(k,i),0._sp)*psi_old(k+1,i))/dzn(k-1) &
+                              min(wt(k,i),0._sp)*psi_old(k+1,i))/dz(k-1) &
                               +small))
                               
                     denom2=(dt*((max(ut(k,i),0._sp)*psi_old(k,i)- &
-                              min(ut(k,i-1),0._sp)*psi_old(k,i))/dxn(i-1) + &
+                              min(ut(k,i-1),0._sp)*psi_old(k,i))/dx(i-1) + &
                             (max(wt(k,i),0._sp)*psi_old(k,i)-&
-                              min(wt(k-1,i),0._sp)*psi_old(k,i))/dzn(k-1) &
+                              min(wt(k-1,i),0._sp)*psi_old(k,i))/dz(k-1) &
                               +small))
                               
                     beta_i_up(k,i)=(psi_i_max(k,i)-psi_old(k,i)) / denom1
@@ -851,22 +852,22 @@
             beta_i_up(:,-l_h+1:0)       =beta_i_up(:,ip-l_h+1:ip)
             beta_i_up(:,ip+1:ip+r_h)    =beta_i_up(:,1:r_h)
             beta_i_up(0,:)=0._sp
-            beta_i_up(kp,:)=0._sp
+            beta_i_up(kp+1,:)=0._sp
             
             beta_i_down(:,-l_h+1:0)     =beta_i_down(:,ip-l_h+1:ip)
             beta_i_down(:,ip+1:ip+r_h)  =beta_i_down(:,1:r_h)
             beta_i_down(0,:)=0._sp
-            beta_i_down(kp,:)=0._sp
+            beta_i_down(kp+1,:)=0._sp
             
             beta_k_up(:,-l_h+1:0)       =beta_k_up(:,ip-l_h+1:ip)
             beta_k_up(:,ip+1:ip+r_h)    =beta_k_up(:,1:r_h)
             beta_k_up(0,:)=0._sp
-            beta_k_up(kp,:)=0._sp
+            beta_k_up(kp+1,:)=0._sp
             
             beta_k_down(:,-l_h+1:0)     =beta_k_down(:,ip-l_h+1:ip)
             beta_k_down(:,ip+1:ip+r_h)  =beta_k_down(:,1:r_h)
             beta_k_down(0,:)=0._sp
-            beta_k_down(kp,:)=0._sp
+            beta_k_down(kp+1,:)=0._sp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -906,12 +907,12 @@
             ut(:,-l_h+1:0)      =ut(:,ip-l_h+1:ip)
             ut(:,ip+1:ip+r_h)   =ut(:,1:r_h)
             ut(0,:)=0._sp
-            ut(kp,:)=0._sp
+            ut(kp+1,:)=0._sp
 
             wt(:,-l_h+1:0)      =wt(:,ip-l_h+1:ip)
             wt(:,ip+1:ip+r_h)   =wt(:,1:r_h)
             wt(0,:)=0._sp
-            wt(kp,:)=0._sp
+            wt(kp:kp+1,:)=0._sp
 
 
 		endif
@@ -924,7 +925,7 @@
 		! advect using first order upwind                                                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		do n=1,nq
-            call first_order_upstream_2d(dt,dx,dz,rhoa,&
+            call first_order_upstream_2d(dt,dxn,dzn,rhoa,rhoan, &
                     ip,kp,l_h,r_h,ut,wt,psi_in(:,:,n))
             if((it <= kord) .and. (kord >= 1)) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
