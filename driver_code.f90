@@ -178,7 +178,8 @@
 						call set_halos_2d(ip,kp,o_halo,q(:,:,j))            
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
-						    rhoa,ip,kp,o_halo,o_halo,u,w,q(:,:,j),4,monotone)
+						    rhoa(:,1),rhoa(:,1),&
+						    ip,kp,o_halo,o_halo,u,w,q(:,:,j),4,monotone)
 						
 					enddo
 					if(theta_flag) then
@@ -186,7 +187,8 @@
 						call set_halos_2d(ip,kp,o_halo,theta)        
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
-						    rhoa,ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
+						    rhoa(:,1),rhoa(:,1),&
+						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
 					endif
 				enddo
 			
@@ -200,7 +202,8 @@
 					do j=1,ncat
 						! advection sfvt
 						call mpdata_vec_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
-						    rhoa,ip,kp,c_e(j)-c_s(j)+1,o_halo,o_halo,u,w,&
+						    rhoa(:,1),rhoa(:,1),&
+						    ip,kp,c_e(j)-c_s(j)+1,o_halo,o_halo,u,w,&
 						    q(:,:,c_s(j):c_e(j)),4,monotone)
                     enddo
                     
@@ -209,7 +212,8 @@
 						call set_halos_2d(ip,kp,o_halo,theta)        
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
-						    rhoa,ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
+						    rhoa(:,1),rhoa(:,1),&
+						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
 					endif
 				enddo
 			
@@ -287,9 +291,9 @@
 		else if (microphysics_flag .eq. 3) then
 			call p_microphysics_2d(nq,ncat,n_mode,c_s,c_e, inc, iqc,&
 			                cat_c, cat_r, &
-                            ip,kp,o_halo,dt,dz2,q(:,:,:),precip(:,:,:),&
+                            ip,kp,o_halo,dt,dz2,dz2,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
-						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
+						   zn(:),t,rho(:,:),rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
 						   theta_flag)		
 						   
 		endif       
