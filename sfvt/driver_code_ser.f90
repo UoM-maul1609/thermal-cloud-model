@@ -138,16 +138,16 @@
 			select case (advection_scheme)
 				case (0)
 				    do n2=1,nq
-                        call first_order_upstream_2d(dt,dx,dz,rhoa,&
+                        call first_order_upstream_2d(dt,dxn,dzn,rhoa,rhoan, &
                             ipp,kpp,l_h,r_h,u,w,q(:,:,n2))
                     enddo
 				case (1)
 				    do n2=1,nq
-                        call mpdata_2d(dt,dx,dz,dxn,dzn,rhoa,&
+                        call mpdata_2d(dt,dx,dz,dxn,dzn,rhoa,rhoan, &
                             ipp,kpp,l_h,r_h,u,w,q(:,:,n2),kord,monotone)
                     enddo
 				case (2)
-					call mpdata_vec_2d(dt,dx,dz,dxn,dzn,rhoa,&
+					call mpdata_vec_2d(dt,dx,dz,dxn,dzn,rhoa,rhoan, &
 						ipp,kpp,nq,l_h,r_h,u,w,q(:,:,:),kord, &
 						monotone)
 				case default
@@ -315,16 +315,16 @@
 			select case (advection_scheme)
 				case (0)
 				    do n2=1,nq
-                        call first_order_upstream_1d(dt,dz,rhoa,&
+                        call first_order_upstream_1d(dt,dzn,rhoa,rhoan, &
                             kpp,l_h,r_h,w,q(:,n2))
                     enddo
 				case (1)
 				    do n2=1,nq
-                        call mpdata_1d(dt,dz,dzn,rhoa,&
-                            kpp,l_h,r_h,w,q(:,n2),kord,monotone)
+                        call mpdata_1d(dt,dz,dzn,rhoa,rhoan, &
+                            kpp,l_h,r_h,w,q(:,n2),kord,monotone,0)
                     enddo
 				case (2)
-					call mpdata_vec_1d(dt,dz,dzn,rhoa,&
+					call mpdata_vec_1d(dt,dz,dzn,rhoa,rhoan, &
 						kpp,nq,l_h,r_h,w,q(:,1:nq),kord, &
 						monotone)
 				case default
