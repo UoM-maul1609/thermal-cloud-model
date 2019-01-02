@@ -334,7 +334,7 @@
 						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_sp*dt*vt(k,j,i) * &
 						 ( (vt(k,j+1,i)-vt(k,j-1,i))/(dy(j-1))-u_div2 )
 						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_sp*dt*wt(k,j,i) * &
-						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dx(k-1))-u_div3 )
+						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))-u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
