@@ -767,7 +767,7 @@
 	!>@param[in] ip: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
-	!>@param[in] dz: dz
+	!>@param[in] dz: dz, dzn
 	!>@param[in] o_halo: extra points for advection
 	!>@param[inout] q: q-variables 
 	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
@@ -775,7 +775,7 @@
 	!>@param[inout] p: pressure
 	!>@param[in] z: vertical levels 
 	!>@param[inout] t: temperature 
-	!>@param[inout] rho: density 
+	!>@param[inout] rho, rhon: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
@@ -783,7 +783,7 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc, &
                     cat_c, cat_r, &
-                    ip,kp,o_halo,dt,dz,q,precip,theta,p, z,t,rho,w, &
+                    ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,t,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, theta_flag)
     implicit none
     ! arguments:
@@ -794,7 +794,7 @@
     real(sp), dimension(1:kp,1:ip,1), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
     					theta, p, t, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, rhon
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
@@ -806,8 +806,8 @@
 	do i=1,ip
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
 		                cat_c, cat_r, &
-		                kp,o_halo,dt,dz,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
-							z(:),t(:,i),rho(:,i),w(:,i), &
+		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
+							z(:),t(:,i),rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, theta_flag)
 	enddo
 
@@ -827,7 +827,7 @@
 	!>@param[in] cat_c, cat_r: category index for cloud and rain
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
-	!>@param[in] dz: dz
+	!>@param[in] dz: dz, dzn
 	!>@param[in] o_halo: extra points for advection
 	!>@param[inout] q: q-variables 
 	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
@@ -836,6 +836,7 @@
 	!>@param[inout] z: vertical levels 
 	!>@param[inout] t: temperature 
 	!>@param[inout] rho: density 
+	!>@param[in] rhon: density
 	!>@param[in] u: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
@@ -843,7 +844,7 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, &
                             cat_c, cat_r, &
-                            kp,o_halo,dt,dz,q,precip,theta,p, z,t,rho,u, &
+                            kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,t,rho,rhon,u, &
     						micro_init,hm_flag, mass_ice,theta_flag)
 	use advection_1d
 	use nr, only : dfridr
@@ -856,7 +857,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,1), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: theta, p, t, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhon
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
@@ -1312,8 +1313,8 @@
 		n_step=max(ceiling(maxval(vqr(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
 		vqr(-o_halo:kp+o_halo-1)=-vqr(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-            call mpdata_vec_1d(dt/real(n_step,sp),dz,dz,&
-                            rho,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
+            call mpdata_vec_1d(dt/real(n_step,sp),dz,dzn,&
+                            rho,rhon,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
                             vqr(-o_halo+1:kp+o_halo),&
                             q(:,cst(cat_r):cen(cat_r)),1,.false.)		
         enddo
@@ -1328,8 +1329,8 @@
 		n_step=max(ceiling(maxval(vqc(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
 		vqc(-o_halo:kp+o_halo-1)=-vqc(-o_halo+1:kp+o_halo)
 		do iter=1,n_step
-            call mpdata_vec_1d(dt/real(n_step,sp),dz,dz,&
-                            rho,kp,cen(cat_c)-cst(cat_c)+1,o_halo,o_halo,&
+            call mpdata_vec_1d(dt/real(n_step,sp),dz,dzn,&
+                            rho,rhon,kp,cen(cat_c)-cst(cat_c)+1,o_halo,o_halo,&
                             vqc(-o_halo+1:kp+o_halo),&
                             q(:,cst(cat_c):cen(cat_c)),1,.false.)		
         enddo
