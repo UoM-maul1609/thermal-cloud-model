@@ -155,18 +155,18 @@
 			select case (advection_scheme)
 				case (0)
 				    do n2=1,nq
-                        call first_order_upstream_3d(dt,dx,dy,dz,rhoa,&
+                        call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan,&
                             ipp,jpp,kpp,l_h,r_h,u,v,w,q(:,:,:,n2))
                     enddo
 				case (1)
 				    do n2=1,nq
-                        call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,&
+                        call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,&
                             ipp,jpp,kpp,l_h,r_h,u,v,w,q(:,:,:,n2),kord,monotone,&
                             ring_comm,id, &
                             dims,coords)
                     enddo
 				case (2)
-					call mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,&
+					call mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,&
 						ipp,jpp,kpp,nq,l_h,r_h,u,v,w,q(:,:,:,:),kord, &
 						monotone,ring_comm,id, dims,coords)
 				case default
