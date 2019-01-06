@@ -183,11 +183,11 @@
 ! 				u(j,i)=u(j,i)-imag(test1)
 ! 				w(j,i)=w(j,i)-imag(test2)
 				! w on centred points
-				zc=zn(2) !-z_offset
-				test3=((zn(j+1)-z_offset)-zc)
+				zc=z(2) !-z_offset
+				test3=((z(j+1)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
-				test2=n_bar_mac* sqrt(test2) *cos(k*(x(i)))
+				test2=n_bar_mac* sqrt(test2) *cos(k*(xn(i)))
 				wcen(j,i)=real(test2)
 				
 				
@@ -205,6 +205,7 @@
 
 	u=0._sp
 	w=0._sp
+	! centred differences:
 	u(1:kp,0)=(wcen(1:kp,1)-wcen(0:kp-1,1))*dx/dz
 	do i=1,ip
 		u(1:kp,i)=u(1:kp,i-1)-(wcen(1:kp,i)-wcen(0:kp-1,i))*dx/dz
@@ -223,7 +224,7 @@
 	enddo
 
 	do j=1,kp+o_halo
-		if(zn(j) >= z_offset) exit
+		if(z(j+1) >= z_offset) exit
 
 		w(j,:)=0._sp
 		u(j,:)=0._sp

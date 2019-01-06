@@ -166,7 +166,7 @@
 
  	precip=0._sp
     ! set up vertical level array
-    z=dz*(/(i,i=-o_halo,kp+o_halo-1)/)
+    z=dz*(/(i,i=-o_halo,kp+o_halo-1)/)+dz/2._sp
     zn=z-0.5_sp*dz
     ! set up horizontal level array
     x=dx*(/(i,i=-o_halo,ip+o_halo-1)/)!-0.5_sp*dx
@@ -187,7 +187,7 @@
 		eps2=1.e-5_sp
 		call odeint(z1,p1,p2,eps2,htry,hmin,hydrostatic1,rkqs)
 		p1=p2 ! p1 is the cloud-base pressure, z1 is the cb height
-		zbase=z1(1)-dz
+		zbase=z1(1)-dz*0.5_sp
 		
 		! integrate going downwards - dry adiabatic layer
 		p(1,:)=psurf
@@ -271,7 +271,7 @@
 			if(t(i+1,1).lt.t_ctop) exit
 		enddo
 		istore2=i-1
-		ztop=z(istore2) !(z(istore2-1)+z(istore2))*0.5_sp
+		ztop=zn(istore2) !(z(istore2-1)+z(istore2))*0.5_sp
 		do i=istore,istore2
 			q(i,:,iqv)=eps1*svp_liq(t(i,1))/ &
 								(p(i,1)-svp_liq(t(i,1)))
