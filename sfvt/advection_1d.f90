@@ -221,6 +221,7 @@
 			! associate pointers to targets                                              !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			if(modulo(it2,2).eq.1) then  
+										 
 				wt => w_store1
 				wt_sav => w_store2
 			else if(modulo(it2,2).eq.0) then			
@@ -327,8 +328,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! associate pointers to targets                                              !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            wt => w_store2
-            wt_sav => w_store1
+			wt => w_store2
+			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
 ! 														ut,dims,coords)
