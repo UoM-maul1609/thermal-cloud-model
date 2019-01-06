@@ -220,7 +220,6 @@
 			! associate pointers to targets                                              !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			if(modulo(it2,2).eq.1) then  
-										 
 				wt => w_store1
 				wt_sav => w_store2
 			else if(modulo(it2,2).eq.0) then			
@@ -247,7 +246,7 @@
         ! Smolarkiewicz and Grabowski (1990)                                             !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		if( (it > 1) .and. monotone) then
-			it2=it2+1
+! 			it2=it2+1
 		
 		
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -327,8 +326,13 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! associate pointers to targets                                              !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			wt => w_store2
-			wt_sav => w_store1
+			if(modulo(it2,2).eq.1) then  
+				wt => w_store2
+				wt_sav => w_store1
+			else if(modulo(it2,2).eq.0) then			
+				wt => w_store1
+				wt_sav => w_store2
+			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
 ! 														ut,dims,coords)
