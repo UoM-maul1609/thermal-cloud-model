@@ -237,7 +237,7 @@
     do k=1,3
 	    call hygfx(a, b, real(k,sp)+alpha_s+1.0_sp,0.5_sp,f1)
 	    call hygfx(a, b, real(k,sp)+alpha_s+b_s+1.0_sp, 0.5_sp,f2)
-	    isnow=isnow+c(k)*(f1/(real(k,sp)+alpha_s)+f2/(real(k,sp)+alpha_s+b_s))
+	    isnow=isnow+c(k)*(f1/(real(k,sp)+alpha_s)-f2/(real(k,sp)+alpha_s+b_s))
 	enddo
 	isnow=a_s*pi*gamma(b)/(2._sp**(6._sp+2._sp*alpha_s+b_s)) * isnow
 	
@@ -248,7 +248,7 @@
     do k=1,3
 	    call hygfx(a, b, real(k,sp)+alpha_i+1.0_sp,0.5_sp,f1)
 	    call hygfx(a, b, real(k,sp)+alpha_i+b_i+1.0_sp, 0.5_sp,f2)
-	    iice=iice+c(k)*(f1/(real(k,sp)+alpha_i)+f2/(real(k,sp)+alpha_i+b_i))
+	    iice=iice+c(k)*(f1/(real(k,sp)+alpha_i)-f2/(real(k,sp)+alpha_i+b_i))
 	enddo
 	iice=a_i*pi*gamma(b)/(2._sp**(6._sp+2._sp*alpha_i+b_i)) * iice
 	
