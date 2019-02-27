@@ -43,6 +43,7 @@
 	!>@param[in] hm_flag - flag for switching on / off hm process
 	!>@param[in] theta_flag - flag for advecting theta dry
 	!>@param[in] mass_ice - mass of a single ice crystal (override)
+	!>@param[in] output_interval - output interval
 	!>@param[inout] k
 	!>@param[inout] dsm_by_dz_z_eq_zc
 	!>@param[inout] b
@@ -65,6 +66,7 @@
                                new_file,micro_init,advection_scheme, monotone, &
                                viscous_dissipation, &
                                microphysics_flag,hm_flag,theta_flag,mass_ice, &
+                               output_interval, &
                                ! variables associated with thermal properties
                                k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & 
                                del_c_s,del_c_t,epsilon_therm,w_peak,z_offset, therm_init)
@@ -81,7 +83,7 @@
     implicit none
     integer(i4b), intent(in) :: nq,nprec,ncat, ip,kp, ord, o_halo, advection_scheme, &
                                 inc, iqc, n_mode, cat_c, cat_r
-    real(sp), intent(in) :: runtime, dt, dx,dz, cvis
+    real(sp), intent(in) :: runtime, output_interval, dt, dx,dz, cvis
     integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
     character(len=20), dimension(nq) :: q_name
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q, &
@@ -105,12 +107,15 @@
 
     ! local variables
     integer(i4b) :: nt, i, j, l,m,nsteps, iter
-    real(sp) :: time
+    real(sp) :: time, time_last_output, output_time
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: rhoa
 
     
     ! fudge because dynamics is solenoidal for rhoa=const
     rhoa=1._sp
+    time_last_output=-output_interval
+    output_time=output_interval
+
     
     nt=ceiling(runtime / real(dt,kind=sp) )
     do i=1,nt
@@ -122,11 +127,16 @@
 		call thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc, &
 						b,del_gamma_mac,del_c_s,del_c_t, &
     						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)   	
-        ! output:
-        call output_2d(time,nq,nprec,ip,kp,q_name, q(1:kp,1:ip,:),precip(1:kp,1:ip,:), &
-						theta(1:kp,1:ip),p(1:kp,1:ip), &
-						x(1:ip),xn(1:ip),z(1:kp),zn(1:kp), &
-						t(1:kp,1:ip),u(1:kp,1:ip),w(1:kp,1:ip),new_file)
+
+        if (time-time_last_output >= output_interval) then
+            ! output:
+            call output_2d(time,nq,nprec,ip,kp,q_name, q(1:kp,1:ip,:),&
+                            precip(1:kp,1:ip,:), &
+                            theta(1:kp,1:ip),p(1:kp,1:ip), &
+                            x(1:ip),xn(1:ip),z(1:kp),zn(1:kp), &
+                            t(1:kp,1:ip),u(1:kp,1:ip),w(1:kp,1:ip),new_file)
+            time_last_output=time
+        endif
 
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

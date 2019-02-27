@@ -7,6 +7,7 @@
 	dx=50.,
 	dz=50.,
 	dt=10.,
+	output_interval=10.,
 	cvis=0.2,
  	nq = 5, ! number of q variables
     nprec=1, ! number of precipitation types

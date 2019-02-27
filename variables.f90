@@ -82,7 +82,7 @@
                   z_read
         real(sp) :: dx, dz,dt, runtime, psurf, theta_surf,tsurf, t_cbase, t_ctop, t_thresh, &
         			t_thresh2, w_cb, theta_q_sat,t1old, p111, num_ice, mass_ice, &
-        			num_drop, cvis
+        			num_drop, cvis, output_interval
         integer(i4b) :: ip,kp, n_levels_s, ord, o_halo,halo, updraft_type
         logical :: ice_init=.true., drop_num_init=.false.
         integer(i4b) :: nq = 9, qv=1,qc=2,qr=3,nqc=-1,nqr=-1,qs=4,qg=5,qi=6, &

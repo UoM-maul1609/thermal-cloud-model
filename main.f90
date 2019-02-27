@@ -43,7 +43,8 @@
         					psurf, tsurf, t_cbase, t_ctop, &
         					n_levels_s, q_read, theta_read, rh_read, z_read
         ! define namelist for run parameters
-        namelist /run_vars/ outputfile, runtime, ip, kp, dx, dz, dt, cvis, &
+        namelist /run_vars/ outputfile, runtime, ip, kp, dx, dz, dt, &
+                    output_interval, cvis, &
                     nq, nprec, &
         			advection_scheme, ord, halo, &
         			monotone, viscous_dissipation, microphysics_flag, &
@@ -182,6 +183,7 @@
                             monotone,viscous_dissipation, &
                             microphysics_flag,hm_flag,theta_flag, &
                             mass_ice, &
+                            output_interval, &
                             k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & ! variables associated 
                             del_c_s,del_c_t,epsilon_therm,w_peak, &
                             z_offset, & ! with thermal props
