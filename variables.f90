@@ -17,7 +17,7 @@
             ! variables for grid
             integer(i4b) :: n_levels,nq,ncat, nprec, &
                             iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
-                            cat_c, cat_r
+                            cat_am, cat_c, cat_r
             real(sp) :: dx,dz, dt, &
                 zbase,ztop
             real(sp), dimension(:,:,:), allocatable :: q, qold, precip

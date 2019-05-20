@@ -27,7 +27,7 @@
 	!>@param[in] cvis: coefficient for viscosity
 	!>@param[in] c_s, c_e: start and end indices for a category
 	!>@param[in] inc, iqc: indices for cloud number and mass
-	!>@param[in] cat_c, cat_r: category index for cloud and rain
+	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
 	!>@param[in] q_name: name of categories
 	!>@param[in] dx,dz - grid spacing
 	!>@param[in] dx2,dz2 - grid spacing
@@ -59,7 +59,7 @@
                                dt,cvis,  &
                                c_s, c_e, &
                                inc, iqc, &
-                               cat_c, cat_r, &
+                               cat_am,cat_c, cat_r, &
                                q_name, &
                                q,qold, precip,theta,th_old, p,dx,dz,dx2,dz2,x,xn,z,zn,t,rho,&
                                u,w,delsq, vis, &
@@ -82,7 +82,7 @@
 
     implicit none
     integer(i4b), intent(in) :: nq,nprec,ncat, ip,kp, ord, o_halo, advection_scheme, &
-                                inc, iqc, n_mode, cat_c, cat_r
+                                inc, iqc, n_mode, cat_am,cat_c, cat_r
     real(sp), intent(in) :: runtime, output_interval, dt, dx,dz, cvis
     integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
     character(len=20), dimension(nq) :: q_name
@@ -300,7 +300,7 @@
 						   
 		else if (microphysics_flag .eq. 3) then
 			call p_microphysics_2d(nq,ncat,n_mode,c_s,c_e, inc, iqc,&
-			                cat_c, cat_r, &
+			                cat_am,cat_c, cat_r, &
                             ip,kp,o_halo,dt,dz2,dz2,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
 						   zn(:),t,rho(:,:),rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &

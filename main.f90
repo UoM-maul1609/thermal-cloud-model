@@ -96,12 +96,13 @@
                     grid1%nprec, &
                     grid1%iqv, grid1%iqc, grid1%inc)
             case(3) ! pamm
-                call read_in_pamm_bam_namelist(bam_nmlfile, &
-                    aero_nmlfile, aero_prof_flag, &
+                call read_in_pamm_bam_namelist(bam_nmlfile,aero_nmlfile, &
+                    aero_prof_flag, &
                     grid1%q_name,grid1%q_type,grid1%c_s,grid1%c_e,grid1%nq,&
                     grid1%ncat, &
                     grid1%nprec, grid1%n_mode, &
-                    grid1%iqv, grid1%iqc, grid1%inc, grid1%cat_c, grid1%cat_r)    
+                    grid1%iqv, grid1%iqc, grid1%inc, grid1%cat_am, &
+                    grid1%cat_c, grid1%cat_r)    
 			case default
 				print *, 'error'
 				stop
@@ -171,7 +172,7 @@
                             ip,kp,ord,o_halo,runtime,dt, cvis, &
                             grid1%c_s,grid1%c_e, &
                             grid1%inc,grid1%iqc, &
-                            grid1%cat_c, grid1%cat_r, &
+                            grid1%cat_am, grid1%cat_c, grid1%cat_r, &
                             grid1%q_name, &
         					grid1%q,grid1%qold, &
         					grid1%precip,grid1%theta, grid1%th_old, &
