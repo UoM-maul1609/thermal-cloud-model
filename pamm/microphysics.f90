@@ -88,7 +88,7 @@
 				
 	real(sp), dimension(3) :: c=[1._sp,2._sp,1._sp]
 	integer(i4b) :: k
-	real(sp) :: isnow, iice, f1,f2,a,b, qsmall=1e-30_sp
+	real(sp) :: isnow, iice, f1,f2,a,b, qsmall=1.e-30_sp
 	
 	integer :: n_modes_prof, n_levels_s
 	real(sp), allocatable, dimension(:,:) :: n_read, sig_read, d_read
@@ -166,18 +166,77 @@
 	    real(sp), intent(in) :: n,s,m, rho
 	    real(sp), intent(inout) :: sig_aer, d_aer
 	
-	    ! this was derived by calculating moments of the distribution
-	    ! and solving to find dm and sig
-	    sig_aer=log( (36._sp*m**2*n*pi/rho**2)**(1._sp/3._sp) / s )
-	    sig_aer=sqrt(sig_aer)
-	    
-	    d_aer=(log(6._sp*m/(n*pi*rho))-4.5_sp*sig_aer**2) / 3._sp
-	    d_aer=exp(d_aer)	
-	
+	    if(m .gt. 0._sp) then
+            ! this was derived by calculating moments of the distribution
+            ! and solving to find dm and sig
+            sig_aer=log( (36._sp*m**2*n*pi/rho**2)**(1._sp/3._sp) / s )
+            sig_aer=sqrt(sig_aer)
+        
+            d_aer=(log(6._sp*m/(n*pi*rho))-4.5_sp*sig_aer**2) / 3._sp
+            d_aer=exp(d_aer)	
+        else
+            sig_aer=0.3_sp
+            d_aer=60.e-9_sp            
+        endif	
 	end subroutine ln_params_from_integral_moms
 	
 
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculate the parameters and properties of a lognormal distribution
+	!>@param[in] n_mode, n,s,m
+	!>@param[inout] rho, molw, nu, n_aer, sig_aer,d_aer,n_mix,s_mix,m_mix
+	subroutine ln_params_and_props_from_integral_moms(n_mode,&
+	                            n,s,m,n_aer,rho,molw,nu, &
+	                            sig_aer,d_aer,n_mix,s_mix,m_mix)
+	    implicit none
+	    integer(i4b), intent(in) :: n_mode
+	    real(sp), intent(in) :: n
+	    real(sp), dimension(n_mode-1), intent(in) :: s,m
+	    real(sp), dimension(n_mode), intent(inout) :: rho,molw,nu
+	    real(sp), intent(inout) :: n_aer,sig_aer, d_aer,n_mix,s_mix,m_mix
 
+        
+	    n_aer=n
+	    n_mix=n
+	    s_mix=sum(s)
+	    m_mix=sum(m)
+        if(m_mix .gt. 0._sp) then
+            ! conserve volume of particle:	
+            rho(n_mode) = sum(m) / sum(m*rho(1:n_mode-1))
+            rho(n_mode) = 1._sp/rho(n_mode)
+            ! conserve total number of moles in particle:	
+            molw(n_mode) = sum(m) / sum(m*molw(1:n_mode-1))
+            molw(n_mode) = 1._sp / molw(n_mode)
+            ! conserve total number of moles of ions in particle:	
+            nu(n_mode) = molw(n_mode) * sum(m*nu(1:n_mode-1)/molw(1:n_mode-1)) / sum(m) 
+
+            ! this was derived by calculating moments of the distribution
+            ! and solving to find dm and sig
+            sig_aer=log( (36._sp*m_mix**2*n*pi/rho(n_mode)**2)**(1._sp/3._sp) / s_mix )
+            if(sig_aer.le.0._sp) then
+                sig_aer=0.3_sp
+                d_aer=60.e-9_sp
+                n_aer=0._sp
+            else
+                sig_aer=sqrt(sig_aer)
+        
+                d_aer=(log(6._sp*m_mix/(n*pi*rho(n_mode)))-4.5_sp*sig_aer**2) / 3._sp
+                d_aer=exp(d_aer)	
+            endif
+
+        else
+            rho(n_mode)=rho(n_mode-1)    
+            molw(n_mode)=molw(n_mode-1)    
+            nu(n_mode)=nu(n_mode-1)    
+            
+            sig_aer=0.3_sp
+            d_aer=60.e-9_sp
+        endif
+        
+	end subroutine ln_params_and_props_from_integral_moms
+	
 
 
 	
@@ -191,17 +250,18 @@
 	!>@param[in] nmlfile, aero_nmlfile
 	!>@param[in] aero_prof_flag
 	!>@param[inout] q_name, q_type, c_s, c_e
-	!>@param[inout] nq,ncat, nprec, iqv, iqc, inc, n_modeg, cat_c, cat_r
+	!>@param[inout] nq,ncat, nprec, iqv, iqc, inc, n_modeg, cat_am,cat_c, cat_r
 	subroutine read_in_pamm_bam_namelist(nmlfile, aero_nmlfile, &
 	            aero_prof_flag, &
                 q_name,q_type,c_s,c_e,nq,ncat,nprec,n_modeg, &
-                iqv,iqc,inc, cat_c, cat_r)
+                iqv,iqc,inc, cat_am,cat_c, cat_r)
 		use bam, only : read_in_bam_namelist, n_mode
 		implicit none
         logical :: aero_prof_flag
         character (len=200), intent(in) :: nmlfile
         character (len=200), intent(in) :: aero_nmlfile
-        integer(i4b), intent(inout) :: nq, ncat, nprec, iqv, iqc, inc, cat_c, cat_r
+        integer(i4b), intent(inout) :: nq, ncat, nprec, iqv, iqc, inc, cat_am,&
+            cat_c, cat_r
         integer(i4b), intent(inout) :: n_modeg
         integer(i4b), intent(inout), dimension(:), allocatable :: q_type, c_s, c_e
         character(len=20), dimension(:), allocatable :: q_name
@@ -243,79 +303,93 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         endif        
         
-        n_modeg=n_mode
-        ncat=3+n_mode
+        n_modeg=n_mode  ! number of modes used in activation (>=1)
+                        ! if n_mode==1 there there should be no mixed mode
+        ncat=3+n_mode   ! number of categories that are advected separately
 
         
-        nq=5+n_mode*3*3 ! vapour, cloud mass, rain mass, cloud water, rain water
-                        ! external mixtures, aerosol in cloud water, aerosol in rain water
+        nq=6+ &              ! vapour, qc,qr,nc,nr,mixed-mode number
+            (n_mode-1)*3 + & ! aerosol
+            (n_mode-1)*3 + & ! mixed-mode aerosol
+            (n_mode-1)*3 + & ! aerosol in cloud water
+            (n_mode-1)*3     ! aerosol in rain water
 
         allocate(q_name(nq))
         allocate(q_type(ncat))
         allocate(c_s(ncat))
         allocate(c_e(ncat))
-        
+
         q_type(1)=0 ! vapour
         c_s(1)=1
         c_e(1)=1
-        do i=1,n_mode
+        do i=1,n_mode-1
             q_type(i+1)=3   ! aerosol
             c_s(i+1)=(i-1)*3+2
-            c_e(i+1)=(i)*3+2-1 !4
+            c_e(i+1)=(i)*3+2-1 
         enddo
-                
-        q_type(2+n_mode:2+n_mode)=1 ! cloud water
-        c_s(2+n_mode:2+n_mode)=(n_mode)*3+2
-        c_e(2+n_mode:2+n_mode)=(n_mode)*3+2+1+3*(n_mode)
-        
+        i=n_mode ! last mode is mixed-mode - 3x(n_mode-1)+1 for total number
+        q_type(i+1)=3   ! aerosol
+        c_s(i+1)=(i-1)*3+2
+        c_e(i+1)=2+(n_mode-1)*6
+
+
+        q_type(2+n_mode:2+n_mode)=1 
+            ! cloud water - 3*(n_mode-1)+2 (for cloud number and mass)
+        c_s(2+n_mode:2+n_mode)=(n_mode-1)*6+3
+        c_e(2+n_mode:2+n_mode)=(n_mode-1)*6+3+1+3*(n_mode-1)
+
         q_type(3+n_mode:3+n_mode)=1 ! rain water        
-        c_s(3+n_mode:3+n_mode)=(n_mode)*3+2+1+3*(n_mode)+1
-        c_e(3+n_mode:3+n_mode)=(n_mode)*3+2+1+3*(n_mode)+2+n_mode*3
-        
+        c_s(3+n_mode:3+n_mode)=(n_mode-1)*6+3+2+3*(n_mode-1)
+        c_e(3+n_mode:3+n_mode)=(n_mode-1)*6+3+2+3*(n_mode-1)+1+3*(n_mode-1)
         
         
         ! name the categories
         q_name(1)="qv"
         ! next externally mixed aerosol particles
-        do i=1,n_mode
-            if(i.lt.n_mode) then
-                q_name((i-1)*3+2)="an_" // itoa(i)
-                q_name((i-1)*3+3)="as_" // itoa(i)
-                q_name((i-1)*3+4)="am_" // itoa(i)
-            else
-                q_name((i-1)*3+2) = "an_m"
-                q_name((i-1)*3+3) = "as_m"
-                q_name((i-1)*3+4) = "am_m"
-            endif            
+        do i=1,n_mode-1
+            q_name((i-1)*3+2)="an_" // itoa(i)
+            q_name((i-1)*3+3)="as_" // itoa(i)
+            q_name((i-1)*3+4)="am_" // itoa(i)
         enddo
+        
+        ! internally mixed aerosol particles (total number, then n,sa,m for each)
+        q_name((n_mode-1)*3+2)="an_m_t"
+        do i=1,n_mode-1
+            q_name((n_mode-1)*3+3+(i-1)*3) = "an_m_" // itoa(i)
+            q_name((n_mode-1)*3+4+(i-1)*3) = "as_m_" // itoa(i)
+            q_name((n_mode-1)*3+5+(i-1)*3) = "am_m_" // itoa(i)
+        enddo
+
         ! cloud water
-        q_name((n_mode-1)*3+5) = "nc"
-        q_name((n_mode-1)*3+6) = "qc"
+        q_name((n_mode-1)*6+3) = "nc"
+        q_name((n_mode-1)*6+4) = "qc"
         ! aerosol particles in cloud water
-        do i=1,n_mode
-            q_name((n_mode-1)*3+7+(i-1)*3)="cn_" // itoa(i)
-            q_name((n_mode-1)*3+8+(i-1)*3)="cs_" // itoa(i)
-            q_name((n_mode-1)*3+9+(i-1)*3)="cm_" // itoa(i)
+        do i=1,n_mode-1
+            q_name((n_mode-1)*6+5+(i-1)*3)="cn_" // itoa(i)
+            q_name((n_mode-1)*6+6+(i-1)*3)="cs_" // itoa(i)
+            q_name((n_mode-1)*6+7+(i-1)*3)="cm_" // itoa(i)
         enddo
         ! rain water
-        q_name((n_mode-1)*3+10+(n_mode-1)*3) = "nr"
-        q_name((n_mode-1)*3+11+(n_mode-1)*3) = "qr"
+        q_name((n_mode-1)*6+3*(n_mode-1)+5) = "nr"
+        q_name((n_mode-1)*6+3*(n_mode-1)+6) = "qr"
         ! aerosol particles in rain water
-        do i=1,n_mode
-            q_name((n_mode-1)*3+12+(n_mode-1)*3+(i-1)*3)="rn_" // itoa(i)
-            q_name((n_mode-1)*3+13+(n_mode-1)*3+(i-1)*3)="rs_" // itoa(i)
-            q_name((n_mode-1)*3+14+(n_mode-1)*3+(i-1)*3)="rm_" // itoa(i)
+        do i=1,n_mode-1
+            q_name((n_mode-1)*6+3*(n_mode-1)+7+(i-1)*3)="rn_" // itoa(i)
+            q_name((n_mode-1)*6+3*(n_mode-1)+8+(i-1)*3)="rs_" // itoa(i)
+            q_name((n_mode-1)*6+3*(n_mode-1)+9+(i-1)*3)="rm_" // itoa(i)
         enddo
-        inc=(n_mode-1)*3+5
-        iqc=(n_mode-1)*3+6        
-
+        
+        inc=(n_mode-1)*6+3
+        iqc=(n_mode-1)*6+4       
         
         nprec=1
 
         iqv=1
         
-        cat_c=1+(n_mode)+1
+        cat_am=(n_mode-1)+2
+        cat_c=cat_am+1
         cat_r=cat_c+1
+
                 
 	end subroutine read_in_pamm_bam_namelist
 
@@ -389,7 +463,7 @@
             endif 
             
                         
-            do i=1,n_mode
+            do i=1,n_mode-1 ! only fill external mixtures
                 ! zeroth moment:
                 q(k,(i-1)*3+2)=n_aer1(i) 
                 ! surface area: 2nd moment x pi:
@@ -408,31 +482,31 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! initialise aerosol in cloud water    
             !  
-            if(q(k,(n_mode-1)*3+5) .gt. 0._sp) then 
+            if(q(k,(n_mode-1)*6+3) .gt. 0._sp) then 
 
                 
-                call find_d_and_s_crits(p(k),t(k),q(k,(n_mode-1)*3+5),w,smax,dcrit)
+                call find_d_and_s_crits(p(k),t(k),q(k,(n_mode-1)*6+3),w,smax,dcrit)
                 ! dcrit is set now
                 ! partial moments of a lognormal distribution:
                 ! see:
                 ! https://math.stackexchange.com/questions/2055782/partial_expectations_of_lognormal_distributions
-                do i=1,n_mode
+                do i=1,n_mode-1 ! only for external mixtures
                     ! number
-                    q(k,(n_mode-1)*3+7+(i-1)*3)= &
+                    q(k,(n_mode-1)*6+5+(i-1)*3)= &
                         ln_part_mom(0,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
-                    q(k,(i-1)*3+2)=q(k,(i-1)*3+2)-q(k,(n_mode-1)*3+7+(i-1)*3)
+                    q(k,(i-1)*3+2)=q(k,(i-1)*3+2)-q(k,(n_mode-1)*6+5+(i-1)*3)
                     
                     
                     ! surface area
-                    q(k,(n_mode-1)*3+8+(i-1)*3)= pi* &
+                    q(k,(n_mode-1)*6+6+(i-1)*3)= pi* &
                         ln_part_mom(2,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
-                    q(k,(i-1)*3+3)=q(k,(i-1)*3+3)-q(k,(n_mode-1)*3+8+(i-1)*3)
+                    q(k,(i-1)*3+3)=q(k,(i-1)*3+3)-q(k,(n_mode-1)*6+6+(i-1)*3)
                     
                     
                     ! mass
-                    q(k,(n_mode-1)*3+9+(i-1)*3)= pi/6._sp*density_core1(i)* &
+                    q(k,(n_mode-1)*6+7+(i-1)*3)= pi/6._sp*density_core1(i)* &
                         ln_part_mom(3,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
-                    q(k,(i-1)*3+4)=q(k,(i-1)*3+4)-q(k,(n_mode-1)*3+9+(i-1)*3)
+                    q(k,(i-1)*3+4)=q(k,(i-1)*3+4)-q(k,(n_mode-1)*6+7+(i-1)*3)
                 enddo
                 
                 
@@ -529,7 +603,7 @@
             endif 
             
                         
-            do i=1,n_mode
+            do i=1,n_mode-1 ! only fill external mixtures
                 ! zeroth moment:
                 q(k,:,(i-1)*3+2)=n_aer1(i) 
                 ! surface area: 2nd moment x pi:
@@ -548,32 +622,33 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! initialise aerosol in cloud water    
             !  
-            if(q(k,1,(n_mode-1)*3+5) .gt. 0._sp) then 
+            if(q(k,1,(n_mode-1)*6+3) .gt. 0._sp) then 
 
                 
-                call find_d_and_s_crits(p(k,1),t(k,1),q(k,1,(n_mode-1)*3+5),w,smax,dcrit)
-                q(k,:,(n_mode-1)*3+5)=q(k,1,(n_mode-1)*3+5)
+                call find_d_and_s_crits(p(k,1),t(k,1),q(k,1,(n_mode-1)*6+3),w,smax,dcrit)
+                q(k,:,(n_mode-1)*6+3)=q(k,1,(n_mode-1)*6+3)
                 ! dcrit is set now
                 ! partial moments of a lognormal distribution:
                 ! see:
                 ! https://math.stackexchange.com/questions/2055782/partial_expectations_of_lognormal_distributions
-                do i=1,n_mode
+                do i=1,n_mode-1 ! only fill external mixtures
                     ! number
-                    q(k,:,(n_mode-1)*3+7+(i-1)*3)= &
+                     ! number
+                    q(k,:,(n_mode-1)*6+5+(i-1)*3)= &
                         ln_part_mom(0,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
-                    q(k,:,(i-1)*3+2)=q(k,:,(i-1)*3+2)-q(k,:,(n_mode-1)*3+7+(i-1)*3)
+                    q(k,:,(i-1)*3+2)=q(k,:,(i-1)*3+2)-q(k,:,(n_mode-1)*6+5+(i-1)*3)
                     
                     
                     ! surface area
-                    q(k,:,(n_mode-1)*3+8+(i-1)*3)= pi* &
+                    q(k,:,(n_mode-1)*6+6+(i-1)*3)= pi* &
                         ln_part_mom(2,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
-                    q(k,:,(i-1)*3+3)=q(k,:,(i-1)*3+3)-q(k,:,(n_mode-1)*3+8+(i-1)*3)
+                    q(k,:,(i-1)*3+3)=q(k,:,(i-1)*3+3)-q(k,:,(n_mode-1)*6+6+(i-1)*3)
                     
                     
                     ! mass
-                    q(k,:,(n_mode-1)*3+9+(i-1)*3)= pi/6._sp*density_core1(i)* &
+                    q(k,:,(n_mode-1)*6+7+(i-1)*3)= pi/6._sp*density_core1(i)* &
                         ln_part_mom(3,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
-                    q(k,:,(i-1)*3+4)=q(k,:,(i-1)*3+4)-q(k,:,(n_mode-1)*3+9+(i-1)*3)
+                    q(k,:,(i-1)*3+4)=q(k,:,(i-1)*3+4)-q(k,:,(n_mode-1)*6+7+(i-1)*3)
                 enddo
                 
                 
@@ -763,7 +838,7 @@
 	!>@param[in] n_mode: number of aerosol modes
 	!>@param[in] cst,cen: indices of categories
 	!>@param[in] inc, iqc: index of cloud number, index of cloud mass
-	!>@param[in] cat_c, cat_r: category index for cloud and rain
+	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
 	!>@param[in] ip: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
@@ -782,12 +857,13 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc, &
-                    cat_c, cat_r, &
+                    cat_am,cat_c, cat_r, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,t,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, theta_flag)
     implicit none
     ! arguments:
-    integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, cat_c, cat_r
+    integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, cat_am,&
+        cat_c, cat_r
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
@@ -805,7 +881,7 @@
 	
 	do i=1,ip
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
-		                cat_c, cat_r, &
+		                cat_am,cat_c, cat_r, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),t(:,i),rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, theta_flag)
@@ -824,7 +900,7 @@
 	!>@param[in] n_mode: number of aerosol modes
 	!>@param[in] cst,cen: indices of categories
 	!>@param[in] inc, iqc: index of cloud number, index of cloud mass
-	!>@param[in] cat_c, cat_r: category index for cloud and rain
+	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
 	!>@param[in] dz: dz, dzn
@@ -843,7 +919,7 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, &
-                            cat_c, cat_r, &
+                            cat_am,cat_c, cat_r, &
                             kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,t,rho,rhon,u, &
     						micro_init,hm_flag, mass_ice,theta_flag)
 	use advection_1d
@@ -851,7 +927,7 @@
 	use advection_s_1d, only : mpdata_vec_1d
     implicit none
     ! arguments:
-    integer(i4b), intent(in) :: nq, ncat,n_mode, kp, o_halo, inc, iqc, cat_c, cat_r
+    integer(i4b), intent(in) :: nq, ncat,n_mode, kp, o_halo, inc, iqc, cat_am,cat_c, cat_r
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
@@ -921,7 +997,8 @@
 	                                        vqc, vnc
 	! coalescence efficiencies
 	real(sp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
-	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3
+	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
+	            n_mix,s_mix,m_mix
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
@@ -1075,7 +1152,8 @@
 
 
         k1=max(k-1,1)
-	    if((q(k,iqc) .gt. qsmall) .and. (q(k1,iqc) .lt. qsmall)) then
+	    if((q(k,iqc) .gt. qsmall) .and. (q(k1,iqc) .le. qsmall)) then
+	    !if((q(k,iqc) .gt. qsmall) .and. (q(k,inc) .lt. qsmall)) then
 	    
 	    
 !	        do kk=k-1,k+2
@@ -1083,17 +1161,27 @@
 	            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	            ! Calculate the lognormal parameters                                     !
 	            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	            do i=1,n_mode
+	            do i=1,n_mode-1
     	            call ln_params_from_integral_moms(&
     	                q(kk,cst(i+1)),q(kk,cst(i+1)+1),q(kk,cst(i+1)+2), &
     	                density_core1(i),sig_aer1(i),d_aer1(i))
     	            n_aer1(i)=q(kk,cst(i+1))
 	            enddo        
+	            ! calculate ln params and relevant terms for mixed-mode, density, etc
+	            ! note that we assume that surface area does not change. In reality it 
+	            ! does depending on aerosol type
+	            call ln_params_and_props_from_integral_moms( &
+	                n_mode, &
+	                q(kk,cst(cat_am)), & ! total number
+	                q(kk,cst(cat_am)+2:cen(cat_am)-1:3), & ! surface area
+	                q(kk,cst(cat_am)+3:cen(cat_am):3), & ! mass 
+	                n_aer1(n_mode),density_core1, &
+	                molw_core1,nu_core1, & 
+	                sig_aer1(n_mode),d_aer1(n_mode),n_mix,s_mix,m_mix)
 	            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	            
-                n_aer1=max(n_aer1,0.1_sp)
-	            
-	        
+!                 n_aer1=max(n_aer1,0.1_sp)
+
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! Bulk Aerosol Activation - number of drops
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1102,10 +1190,10 @@
                 t_test=t(kk)
                 w_test=max(u(kk),0.001_sp)
                 call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
-                            n_aer1,d_aer1,sig_aer1, molw_org1,density_core1)
-        
+                            max(n_aer1,0.1e6),d_aer1,sig_aer1, molw_org1,density_core1)
+
                 call ctmm_activation(n_mode,n_sv,sv_flag, &
-                            n_aer1, d_aer1,sig_aer1,molw_core1, &
+                            max(n_aer1,0.1e6), d_aer1,sig_aer1,molw_core1, &
                             density_core1, nu_core1, &
                             org_content1,molw_org1, density_org1, delta_h_vap1, nu_org1, &
                             log_c_star1, &
@@ -1113,10 +1201,10 @@
                             act_frac1,smax1,dcrit2)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
+                act_frac1=max(act_frac1,0._sp)
                 temp1=sum(n_aer1*act_frac1)
-                ! put in-cloud aerosol into aerosol
-                do i=1,n_mode
+                ! put in-cloud aerosol into aerosol - fine
+                do i=1,n_mode-1
                     q(kk,cst(i+1))=  q(kk,cst(i+1))+q(kk,cst(cat_c)+(i-1)*3+2)
                     q(kk,cst(i+1)+1)=q(kk,cst(i+1)+1)+q(kk,cst(cat_c)+(i-1)*3+3)
                     q(kk,cst(i+1)+2)=q(kk,cst(i+1)+2)+q(kk,cst(cat_c)+(i-1)*3+4)
@@ -1127,7 +1215,7 @@
                 ! cloud droplet number
                 q(kk  ,inc)=temp1
                 ! deplete aerosol
-                do i=1,n_mode
+                do i=1,n_mode-1
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! remove from aerosol particles:                                     !
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1159,11 +1247,62 @@
                     ! mass in aerosol modes
                     q(kk,cst(cat_c)+(i-1)*3+4)=q(kk,cst(cat_c)+(i-1)*3+4)+dummy3
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
                 enddo
+                ! deplete aerosol from mixed mode
+                ! this calculates the total depletion. For each component
+                ! deplete, base on fraction of each component
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! remove from aerosol particles:                                         !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! number in aerosol modes
+                dummy1=ln_part_mom(0,dcrit2(n_mode),n_aer1(n_mode), &
+                                sig_aer1(n_mode),d_aer1(n_mode))
+                ! surface area in aerosol modes
+                dummy2=pi*ln_part_mom(2,dcrit2(n_mode),n_aer1(n_mode), &
+                                sig_aer1(n_mode),d_aer1(n_mode))
+                ! mass in aerosol modes
+                dummy3=pi/6._sp*density_core1(n_mode)* &
+                    ln_part_mom(3,dcrit2(n_mode),n_aer1(n_mode), &
+                                sig_aer1(n_mode),d_aer1(n_mode))
+                                
+                q(kk,cst(cat_am))=q(kk,cst(cat_am))-n_mix
+                do i=1,n_mode-1 ! deplete aerosol
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! add to aerosol particles in cloud water                            !
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! number in aerosol modes
+                    ! qv, n_mode aerosol + 1
+                    q(kk,cst(cat_c)+(i-1)*3+2)=q(kk,cst(cat_c)+(i-1)*3+2)+ &
+                        max(dummy1/(n_mix)*q(kk,cst(cat_am)+3*(i-1)+1),0._sp)
+                    
+                    ! surface area in aerosol modes
+                    q(kk,cst(cat_c)+(i-1)*3+3)=q(kk,cst(cat_c)+(i-1)*3+3)+ &
+                        max(dummy2/(s_mix)*q(kk,cst(cat_am)+3*(i-1)+2),0._sp)
+                    
+                    ! mass in aerosol modes
+                    q(kk,cst(cat_c)+(i-1)*3+4)=q(kk,cst(cat_c)+(i-1)*3+4)+ &
+                        max(dummy3/(m_mix)*q(kk,cst(cat_am)+3*(i-1)+3),0._sp)
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+                    ! number - remove aerosol particles
+                    q(kk,cst(cat_am)+3*(i-1)+1)=q(kk,cst(cat_am)+3*(i-1)+1) * &
+                            (1._sp-max(dummy1/(n_mix),0._sp))
+                    
+                    ! surface area
+                    q(kk,cst(cat_am)+3*(i-1)+2)=q(kk,cst(cat_am)+3*(i-1)+2)* &
+                            (1._sp-max(dummy2/(s_mix),0._sp) )
+                    ! mass
+                    q(kk,cst(cat_am)+3*(i-1)+3)=q(kk,cst(cat_am)+3*(i-1)+3)* &
+                            (1._sp-max(dummy3/(m_mix),0._sp) )
+
+
+                enddo 
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                
+                
             enddo     
-            
                    
         endif      
         
@@ -1195,7 +1334,6 @@
 			prevp(k)=-min(rain_evap,0._sp)
 		endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		
 
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1229,32 +1367,40 @@
     q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
     			(pgacr+pgfr+psacr+piacr_g+piacr_s))*dt
     prevp=min(prevp,q(1:kp,cst(cat_r)+1)/dt)
-    t(1:kp)=t(1:kp)-lv/cp*prevp*dt
-    q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)-prevp*dt
-    q(1:kp,1)=q(1:kp,1)+prevp*dt
     
+    ! rain number
+    q(1:kp,cst(cat_r))=q(1:kp,cst(cat_r))+ &
+        (rraut+rrsel)*dt
 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! rain aerosol
+    ! aerosol going into rain, by coll-coal
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     do k=1,kp
         q(k,cst(cat_r)+2:cen(cat_r))=q(k,cst(cat_r)+2:cen(cat_r))+ &
-                min(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / q(k,cst(cat_c)),1._sp) * &
+           min(max(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / (q(k,cst(cat_c))+qsmall),0._sp),1._sp) * &
                 q(k,cst(cat_c)+2:cen(cat_c))
     enddo
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    
+    
     ! liquid aerosol
     do k=1,kp
         q(k,cst(cat_c)+2:cen(cat_c))=q(k,cst(cat_c)+2:cen(cat_c))- &
-                min(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / q(k,cst(cat_c)),1._sp) * &
+         min(max(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / (q(k,cst(cat_c))+qsmall),0._sp),1._sp) * &
                 q(k,cst(cat_c)+2:cen(cat_c))
     enddo
     ! liquid number
-    q(1:kp,inc)=q(1:kp,inc)-min(-(rcwaut+rcwacr+rcwsel)*dt/q(1:kp,inc),1._sp)* &
+    q(1:kp,inc)=q(1:kp,inc)- &
+        min(max(-(rcwaut+rcwacr+rcwsel)*dt/(q(1:kp,inc)+qsmall),0._sp),1._sp)* &
                             q(1:kp,inc)
         
         
     rho=1._sp ! fudge for advection conservation
     do k=-o_halo+1,kp+o_halo
-        if(q(k,iqc) .lt. qsmall) then
-            do i=1,n_mode
+        if(q(k,iqc) .lt. qsmall) then ! fine
+            do i=1,n_mode-1
                 ! add aerosol in cloud water back to aerosol
                 q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_c)+(i-1)*3+2)
                 q(k,cst(i+1)+1)    =q(k,cst(i+1)+1) +q(k,cst(cat_c)+(i-1)*3+3)
@@ -1267,34 +1413,101 @@
         endif
     enddo
 
-    do k=-o_halo+1,kp+o_halo
-        if(q(k,cst(cat_r)+1) .lt. qsmall) then
+
+
+
+
+    do k=1,kp
+
+        if((prevp(k) .gt. 0._sp)) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! add up the total number of aerosol in rain - all modes
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             dummy1=0._sp
-            do i=1,n_mode
+            do i=1,n_mode-1
                 dummy1=dummy1+q(k,cst(cat_r)+(i-1)*3+2)
             enddo
-            dummy1=max(dummy1,q(k,cst(cat_r)),1._sp)
+            !dummy1=max(dummy1,q(k,cst(cat_r)),1._sp)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! calculate the number conc. of rain drops evaporated
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            dummy2=prevp(k)*(q(k,cst(cat_r))/(qsmall+q(k,cst(cat_r)+1)))*dt
+            dummy2=min(dummy2,q(k,cst(cat_r)))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+            if(dummy2 .lt. qsmall) cycle
+
+
+
         
-            do i=1,n_mode
-                ! add aerosol in rain water back to aerosol
-                !q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_r)+(i-1)*3+2)
-                q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_r)+(i-1)*3+2)* &
-                                 q(k,cst(cat_r)) / dummy1   
-                q(k,cst(i+1)+1)    =q(k,cst(i+1)+1) +q(k,cst(cat_r)+(i-1)*3+3)
-                q(k,cst(i+1)+2)    =q(k,cst(i+1)+2) +q(k,cst(cat_r)+(i-1)*3+4)
-                q(k,cst(cat_r)+(i-1)*3+2)=0._sp
-                q(k,cst(cat_r)+(i-1)*3+3)=0._sp
-                q(k,cst(cat_r)+(i-1)*3+4)=0._sp
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! add evaporated rain particles to mixed-mode aerosol
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
+
+            do i=1,n_mode-1
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! add aerosol in evaporating rain water back to aerosol
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                ! this is number in aerosol, plus number in rain 
+                !  (scaled by fraction in composition category)
+                ! aer_in_rain * rain_num_evap / rain_num
+                q(k,cst(cat_am)+(i-1)*3+1)      = &
+                    q(k,cst(cat_am)+(i-1)*3+1)   + &
+                    q(k,cst(cat_r)+(i-1)*3+2) * &
+                    min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                    
+                ! this is surface area going into aerosol
+                q(k,cst(cat_am)+(i-1)*3+2)    = &
+                    q(k,cst(cat_am)+(i-1)*3+2) +&
+                    q(k,cst(cat_r)+(i-1)*3+3) * &
+                    min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                ! this is mass going into aerosol
+                q(k,cst(cat_am)+(i-1)*3+3)    = &
+                    q(k,cst(cat_am)+(i-1)*3+3) +&
+                    q(k,cst(cat_r)+(i-1)*3+4) * &
+                    min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                
+                ! aerosol in rain
+                q(k,cst(cat_r)+(i-1)*3+2)=q(k,cst(cat_r)+(i-1)*3+2)* &
+                    (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp))
+                    
+                q(k,cst(cat_r)+(i-1)*3+3)=q(k,cst(cat_r)+(i-1)*3+3)* &
+                    (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp))
+                    
+                q(k,cst(cat_r)+(i-1)*3+4)=q(k,cst(cat_r)+(i-1)*3+4)* &
+                    (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp))
+                    
             enddo
-            q(k,cst(cat_r)) = 0.0_sp
+            ! rain number
+            q(k,cst(cat_r)) = q(k,cst(cat_r)) * &
+                (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp ))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
         endif
+        
     enddo
     
-    ! rain number
-    q(1:kp,cst(cat_r))=q(1:kp,cst(cat_r))+ &
-        (rraut+rrsel-prevp*(q(1:kp,cst(cat_r))/(q(1:kp,cst(cat_r)+1)+qsmall)))*dt
 
-    q=max(q,0._sp)	 
+
+
+    t(1:kp)=t(1:kp)-lv/cp*prevp*dt
+    q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)-prevp*dt
+    q(1:kp,1)=q(1:kp,1)+prevp*dt
+
+    q=max(q,0._sp)	
+
+
+     
     if (theta_flag) theta=t*(1.e5_sp/p)**(ra/cp)
 
 
@@ -1337,7 +1550,6 @@
 	endif
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
-    
     
 
     end subroutine p_microphysics_1d
