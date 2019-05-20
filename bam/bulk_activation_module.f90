@@ -165,7 +165,8 @@
 		use nrtype1
 		use nr1, only : zbrent,qsimp,qromb,brent,midpnt
 		implicit none 
-			  real(sp), dimension(:), intent(inout) :: n_aer1,d_aer1, sig_aer1, molw_core1, &
+		      real(sp), dimension(:), intent(in) :: n_aer1
+			  real(sp), dimension(:), intent(inout) :: d_aer1, sig_aer1, molw_core1, &
 													density_core1, nu_core1
 			  real(sp), dimension(:), intent(in) :: org_content1  , molw_org1, &
 			  							density_org1, delta_h_vap1, nu_org1, log_c_star1                               
