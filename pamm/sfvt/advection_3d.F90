@@ -685,8 +685,8 @@
 		implicit none
 		 
 		real(sp), intent(in) :: dt
-		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoa, rhoan,dz, dzn, psi_ref
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
+		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoa, rhoan,dz, dzn, psi_ref
 		real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), intent(in) :: w
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 							intent(inout) :: psi_3d
@@ -707,7 +707,7 @@
 		enddo
 		! bit of a fudge, because this method leads to temperature perturbations
 		! at surface
-		if(coords(3) == 0) psi_3d(1-r_h:1,:,:)=0._sp		
+		!if(coords(3) == 0) psi_3d(1-r_h:1,:,:)=0._sp		
 		
 	end subroutine adv_ref_state
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
