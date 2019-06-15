@@ -189,7 +189,7 @@
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
-						    ip,kp,o_halo,o_halo,u,w,q(:,:,j),4,monotone)
+						    ip,kp,o_halo,o_halo,u,w,q(:,:,j),4,monotone,.false.)
 						
 					enddo
 					if(theta_flag) then
@@ -198,7 +198,7 @@
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
-						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
+						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone,.false.)
 					endif
 				enddo
 			
@@ -214,7 +214,7 @@
 						call mpdata_vec_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
 						    ip,kp,c_e(j)-c_s(j)+1,o_halo,o_halo,u,w,&
-						    q(:,:,c_s(j):c_e(j)),4,monotone)
+						    q(:,:,c_s(j):c_e(j)),4,monotone,.false.)
                     enddo
                     
 					if(theta_flag) then
@@ -223,7 +223,7 @@
 						! advection
 						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
-						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone)
+						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone,.false.)
 					endif
 				enddo
 			
