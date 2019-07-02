@@ -23,8 +23,9 @@
     		ctmm_activation, initialise_arrays, read_in_bam_namelist
     
     private
-    public :: p_microphysics_2d, p_microphysics_1d, read_in_pamm_bam_namelist, &
-            p_initialise_aerosol, p_initialise_aerosol_1d
+    public :: p_microphysics_3d, &
+            p_microphysics_2d, p_microphysics_1d, read_in_pamm_bam_namelist, &
+            p_initialise_aerosol_3d,p_initialise_aerosol, p_initialise_aerosol_1d
     
     ! physical constants
     real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
@@ -673,6 +674,148 @@
     
     
 
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>initialises aerosol profile - 3d version
+	!>@param[in] aero_prof_flag
+	!>@param[in] nq, ncat: number of q variables, categories
+	!>@param[in] c_s, c_e: start and end pointers for categories
+	!>@param[in] inc: pointer to drop number category
+	!>@param[in] ip, jp,kp, o_halo: number of i, k and halo points
+	!>@param[in] x,y,z,rho, p, t: grid values
+	!>@param[inout] q: q_variables
+    subroutine p_initialise_aerosol_3d(aero_prof_flag, nq,ncat,c_s,c_e, &
+                inc, ip,jp,kp,o_halo, x,y,z,rho,p,t,q)
+                
+        use bam, only : n_mode, n_sv, n_aer1, d_aer1, sig_aer1, density_core1, &
+                    nu_core1, molw_core1, org_content1, molw_org1, density_org1, &
+                    delta_h_vap1, nu_org1, log_c_star1, a_eq_7, b_eq_7, &
+                    initialise_arrays, ctmm_activation,find_d_and_s_crits
+        implicit none
+        ! arguments:
+        logical :: aero_prof_flag
+        integer(i4b), intent(in) :: nq, ncat, inc, ip, jp, kp, o_halo
+        integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
+        real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x
+        real(sp), dimension(-o_halo+1:jp+o_halo), intent(in) :: y
+        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
+        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: rho, p, t
+        real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:jp+o_halo,-o_halo+1:ip+o_halo,nq), &
+            intent(inout) :: q
+
+        ! local variables
+        integer(i4b) :: i, k, AllocateStatus, iloc
+        real(sp) :: w, smax, phi, xx, kmom, var, dummy
+        real(sp), dimension(:), allocatable :: act_frac1 , dcrit
+         
+        
+        allocate(act_frac1(1:n_mode))
+        if(AllocateStatus /= 0) STOP "*** Not enough memory ***"
+        allocate(dcrit(1:n_mode))
+        if(AllocateStatus /= 0) STOP "*** Not enough memory ***"
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! initialise prognostic aerosol profiles:                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! use linear interpolation to put sounding on grid:
+		do k=1,kp
+		
+		
+		    if(aero_prof_flag) then
+                iloc=locate(z_read(1:n_levels_s),z(k))
+                iloc=min(n_levels_s-1,iloc)
+                iloc=max(1,iloc)
+                do i=1,n_mode
+                    ! linear interp n_aer
+                    call polint(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    n_aer1(i)=var
+                    ! linear interp sig_aer
+                    call polint(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    sig_aer1(i)=var
+                    ! linear interp d_aer
+                    call polint(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
+                                min(z(k),z_read(n_levels_s)), var,dummy)
+                    d_aer1(i)=var
+                enddo
+            endif 
+            
+                        
+            do i=1,n_mode-1 ! only fill external mixtures
+                ! zeroth moment:
+                q(k,:,:,(i-1)*3+2)=n_aer1(i) 
+                ! surface area: 2nd moment x pi:
+                q(k,:,:,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
+                ! mass: 3rd moment x pi/6*rho:
+                q(k,:,:,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
+                    ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
+
+            enddo
+            
+            
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! 1. find the critical diameter of each aerosol mode, and                    !
+            ! 2. perform integration to set the aerosol n,s,m, in cloud water            !                         
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! initialise aerosol in cloud water    
+            !  
+            if(q(k,1,1,(n_mode-1)*6+3) .gt. 0._sp) then 
+
+                
+                call find_d_and_s_crits(p(k),t(k),&
+                    q(k,1,1,(n_mode-1)*6+3),w,smax,dcrit)
+                
+                q(k,:,:,(n_mode-1)*6+3)=q(k,1,1,(n_mode-1)*6+3)
+                ! dcrit is set now
+                ! partial moments of a lognormal distribution:
+                ! see:
+                ! https://math.stackexchange.com/questions/2055782/partial_expectations_of_lognormal_distributions
+                do i=1,n_mode-1 ! only fill external mixtures
+                    ! number
+                     ! number
+                    q(k,:,:,(n_mode-1)*6+5+(i-1)*3)= &
+                        ln_part_mom(0,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
+                    q(k,:,:,(i-1)*3+2)=q(k,:,:,(i-1)*3+2)-q(k,:,:,(n_mode-1)*6+5+(i-1)*3)
+                    
+                    
+                    ! surface area
+                    q(k,:,:,(n_mode-1)*6+6+(i-1)*3)= pi* &
+                        ln_part_mom(2,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
+                    q(k,:,:,(i-1)*3+3)=q(k,:,:,(i-1)*3+3)-q(k,:,:,(n_mode-1)*6+6+(i-1)*3)
+                    
+                    
+                    ! mass
+                    q(k,:,:,(n_mode-1)*6+7+(i-1)*3)= pi/6._sp*density_core1(i)* &
+                        ln_part_mom(3,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
+                    q(k,:,:,(i-1)*3+4)=q(k,:,:,(i-1)*3+4)-q(k,:,:,(n_mode-1)*6+7+(i-1)*3)
+                enddo
+                
+                
+            else
+                smax=0._sp
+                dcrit=1000._sp
+            endif
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+        
+
+        deallocate(act_frac1)
+        deallocate(dcrit)
+                
+    end subroutine p_initialise_aerosol_3d
+    
+    
+
+
+
 
 
 
@@ -829,6 +972,175 @@
     xstar=2.6e-10_sp ! kg
     end subroutine initialise_microphysics_vars
     
+#if MPI_PAMM == 0
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>solves one time-step of the microphysics - calls p_microphysics_1d
+	!>@param[in] nq: number of q-fields
+	!>@param[in] ncat: number of categories
+	!>@param[in] n_mode: number of aerosol modes
+	!>@param[in] cst,cen: indices of categories
+	!>@param[in] inc, iqc: index of cloud number, index of cloud mass
+	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
+	!>@param[in] ip,jp: number of horizontal levels
+	!>@param[in] kp: number of vertical levels
+	!>@param[in] dt: time-step
+	!>@param[in] dz: dz, dzn
+	!>@param[in] o_halo: extra points for advection
+	!>@param[inout] q: q-variables 
+	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
+	!>@param[inout] theta: theta 
+	!>@param[inout] p: pressure
+	!>@param[in] z: vertical levels 
+	!>@param[inout] thetan: potential temperature 
+	!>@param[inout] rho, rhon: density 
+	!>@param[in] w: vertical wind 
+	!>@param[inout] micro_init: boolean to initialise microphysics 
+	!>@param[in] hm_flag: switch hm-process on and off
+	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] theta_flag: whether to alter theta
+    subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, &
+                    cat_am,cat_c, cat_r, &
+                    ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
+    				micro_init,hm_flag, mass_ice, theta_flag)
+#else
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>solves one time-step of the microphysics - calls p_microphysics_1d
+	!>@param[in] nq: number of q-fields
+	!>@param[in] ncat: number of categories
+	!>@param[in] n_mode: number of aerosol modes
+	!>@param[in] cst,cen: indices of categories
+	!>@param[in] inc, iqc: index of cloud number, index of cloud mass
+	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
+	!>@param[in] ip,jp: number of horizontal levels
+	!>@param[in] kp: number of vertical levels
+	!>@param[in] dt: time-step
+	!>@param[in] dz: dz, dzn
+	!>@param[in] o_halo: extra points for advection
+	!>@param[inout] q: q-variables 
+	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
+	!>@param[inout] theta: theta 
+	!>@param[inout] p: pressure
+	!>@param[in] z: vertical levels 
+	!>@param[inout] thetan: potential temperature 
+	!>@param[inout] rho, rhon: density 
+	!>@param[in] w: vertical wind 
+	!>@param[inout] micro_init: boolean to initialise microphysics 
+	!>@param[in] hm_flag: switch hm-process on and off
+	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] theta_flag: whether to alter theta
+	!>@param[in] comm_vert,id,dims,coords: MPI variables
+    subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, &
+                    cat_am,cat_c, cat_r, &
+                    ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
+    				micro_init,hm_flag, mass_ice, theta_flag, &
+    				comm_vert,id,dims,coords)
+    use mpi
+	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
+#endif
+    implicit none
+    ! arguments:
+    integer(i4b), intent(in) :: nq, ncat, n_mode, ip,jp,kp, inc, iqc, cat_am,&
+        cat_c, cat_r,l_h,r_h
+    integer(i4b), dimension(ncat), intent(in) :: cst,cen
+    real(sp), intent(in) :: dt
+    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
+    real(sp), dimension(1:kp,1:jp,1:ip,1), intent(inout) :: precip
+    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(inout) :: &
+    					th
+    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
+        prefn
+    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
+    logical, intent(in) :: hm_flag, theta_flag
+    logical , intent(inout) :: micro_init
+    real(sp), intent(in) :: mass_ice
+
+	! locals
+	integer(i4b) :: i,j,n, error
+    real(sp), dimension(-l_h+1:kp+r_h) :: rho
+#if MPI_PAMM == 1
+	real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h) :: & 
+	                vqr, vqc
+	integer(i4b), dimension(2) :: n_step,n_step_o,n_step_g
+    integer(i4b), intent(in) :: id, comm_vert
+    integer(i4b), dimension(3), intent(in) :: coords, dims
+    real(sp), dimension(nq) :: lbc,ubc
+    logical, dimension(2) :: adv_lg, adv_l=[.false.,.false.]
+
+    n_step=1
+    n_step_o=1
+    lbc=0._sp
+    ubc=0._sp
+#endif
+	
+    
+	do i=1,ip
+	    do j=1,jp
+#if MPI_PAMM == 0 
+    		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
+		                cat_am,cat_c, cat_r, &
+		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
+		                    prefn, &
+							z(:),thetan,rho(:),rhoan(:),w(:,j,i), &
+    						micro_init,hm_flag, mass_ice, theta_flag)
+#else
+    		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
+		                cat_am,cat_c, cat_r, &
+		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
+		                    prefn, &
+							z(:),thetan,rho(:),rhoan(:),w(:,j,i), &
+							vqc(:,j,i),vqr(:,j,i),n_step, adv_l, &
+    						micro_init,hm_flag, mass_ice, theta_flag)
+    		n_step_o=max(n_step,n_step_o)
+#endif
+    	enddo
+	enddo
+	
+	! collective communication
+#if MPI_PAMM == 1
+	call mpi_allreduce(adv_l(1:2),adv_lg(1:2),2,MPI_LOGICAL,MPI_LOR, comm_vert,error)
+	call mpi_allreduce(n_step_o(1:2),n_step_g(1:2),2,MPI_INTEGER,MPI_MAX, comm_vert,error)
+#endif
+    
+
+#if MPI_PAMM == 1
+    if(adv_lg(1)) then
+        do n=1,n_step_g(1)
+            call mpdata_vec_vert_3d(dt/real(n_step_o(1),sp),dz,dzn,&
+                    rhoa,rhoan, &
+                    ip,jp,kp,cen(cat_c)-cst(cat_c)+1,l_h,r_h,&
+                    vqc,q(:,:,:,cst(cat_c):cen(cat_c)),&
+                    lbc(cst(cat_c):cen(cat_c)),ubc(cst(cat_c):cen(cat_c)), &
+                    1,.false., .false.,comm_vert, id, &
+                    dims,coords)
+        enddo
+    endif       
+     if(adv_lg(2)) then
+        do n=1,n_step_g(2)
+            call mpdata_vec_vert_3d(dt/real(n_step_o(2),sp),dz,dzn,&
+                    rhoa,rhoan, &
+                    ip,jp,kp,cen(cat_r)-cst(cat_r)+1,l_h,r_h,&
+                    vqr,q(:,:,:,cst(cat_r):cen(cat_r)),&
+                    lbc(cst(cat_r):cen(cat_r)),ubc(cst(cat_r):cen(cat_r)), &
+                    1,.false., .false.,comm_vert, id, &
+                    dims,coords) 
+        enddo
+     endif       
+#endif
+	end subroutine p_microphysics_3d
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+	
+	
+    
+    
+    
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -849,7 +1161,7 @@
 	!>@param[inout] theta: theta 
 	!>@param[inout] p: pressure
 	!>@param[in] z: vertical levels 
-	!>@param[inout] t: temperature 
+	!>@param[in] theta_ref: reference potential temperature 
 	!>@param[inout] rho, rhon: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
@@ -858,7 +1170,7 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc, &
                     cat_am,cat_c, cat_r, &
-                    ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,t,rho,rhon,w, &
+                    ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, theta_flag)
     implicit none
     ! arguments:
@@ -869,28 +1181,52 @@
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,1:ip,1), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
-    					theta, p, t, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, rhon
+    					theta, p, rho
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice
 
+
 	! locals
 	integer(i4b) :: i
+#if MPI_PAMM == 1
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: vqc,vqr
+    integer(i4b), dimension(2) :: n_step, n_step_o
+    logical, dimension(2) :: adv_l=[.false.,.false.]
+    
+    n_step_o=1
+#endif
+	
+	
 	
 	do i=1,ip
+#if MPI_PAMM == 0 
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
 		                cat_am,cat_c, cat_r, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
-							z(:),t(:,i),rho(:,i),rhon(:),w(:,i), &
+							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, theta_flag)
+#else
+		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
+		                cat_am,cat_c, cat_r, &
+		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
+							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
+							vqc(:,i),vqr(:,i), n_step, adv_l, &
+    						micro_init,hm_flag, mass_ice, theta_flag)
+    	n_step_o=max(n_step_o,n_step)
+#endif	
 	enddo
 
 
 	end subroutine p_microphysics_2d
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
-	    
+	
+	
+	
+#if MPI_PAMM == 0	    
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -907,10 +1243,10 @@
 	!>@param[in] o_halo: extra points for advection
 	!>@param[inout] q: q-variables 
 	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
-	!>@param[inout] theta: theta 
+	!>@param[inout] th: theta perturbation
 	!>@param[inout] p: pressure
 	!>@param[inout] z: vertical levels 
-	!>@param[inout] t: temperature 
+	!>@param[inout] theta: potential temperature 
 	!>@param[inout] rho: density 
 	!>@param[in] rhon: density
 	!>@param[in] u: vertical wind 
@@ -920,8 +1256,44 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, &
                             cat_am,cat_c, cat_r, &
-                            kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,t,rho,rhon,u, &
+                            kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rho,rhon,u, &
     						micro_init,hm_flag, mass_ice,theta_flag)
+#else
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>solves one time-step of the microphysics
+	!>@param[in] nq: number of q-fields
+	!>@param[in] ncat: number of categories
+	!>@param[in] n_mode: number of aerosol modes
+	!>@param[in] cst,cen: indices of categories
+	!>@param[in] inc, iqc: index of cloud number, index of cloud mass
+	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
+	!>@param[in] kp: number of vertical levels
+	!>@param[in] dt: time-step
+	!>@param[in] dz: dz, dzn
+	!>@param[in] o_halo: extra points for advection
+	!>@param[inout] q: q-variables 
+	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
+	!>@param[inout] th: theta perturbation
+	!>@param[inout] p: pressure
+	!>@param[inout] z: vertical levels 
+	!>@param[inout] theta: potential temperature 
+	!>@param[inout] rho: density 
+	!>@param[in] rhon: density
+	!>@param[in] u: vertical wind 
+	!>@param[inout] vqr,vqc, n_step, adv_l
+	!>@param[inout] micro_init: boolean to initialise microphysics 
+	!>@param[in] hm_flag: switch hm-process on and off
+	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] theta_flag: whether to alter theta
+    subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, &
+                            cat_am,cat_c, cat_r, &
+                            kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rho,rhon,u, &
+                            vqc,vqr,n_step, adv_l, &
+    						micro_init,hm_flag, mass_ice,theta_flag)
+#endif
+
 	use advection_1d
 	use nr, only : dfridr
 	use advection_s_1d, only : mpdata_vec_1d
@@ -932,17 +1304,25 @@
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,1), intent(inout) :: precip
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: theta, p, t, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhon
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: th, rho
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice
     ! locals:
-    integer(i4b) :: k,k1,iter, n_step, i,kk
+    integer(i4b) :: k,k1,iter, i,kk
+#if MPI_PAMM == 1
+    integer(i4b), dimension(2), intent(inout) :: n_step
+	logical, intent(inout), dimension(2) :: adv_l
+#else
+    integer(i4b), dimension(2) :: n_step
+	logical, dimension(2) :: adv_l
+#endif
     real(sp) :: temp, qtot,qaut, a, b, ab_ice, ab_liq, ice_dep,snow_dep,graup_dep, &
     			nu_ice, nu_snow, nu_graup, diff1, ktherm1, tc, nu_vis, sc, nu_rain, rain_evap, &
     			sb_aut, sb_acr, sb_cwaut, sb_cwacr, sb_raut, sb_rsel, sb_cwsel
+    			
     real(sp), dimension(kp) :: smr, smr_i
     
     real(sp), dimension(kp) :: &
@@ -993,8 +1373,14 @@
 
     real(sp), dimension(kp) :: n_r, lam_r, n_i, lam_i, n_s, lam_s, n_g, lam_g, lam_c, n_c
     real(sp), dimension(kp) :: rho_fac
-	real(sp), dimension(-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vnr, vns, vng, vni, &
-	                                        vqc, vnc
+	real(sp), dimension(1-o_halo:kp+o_halo) :: vnr, vnc
+#if MPI_PAMM == 0
+	real(sp), dimension(1-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vns, vng, vni, &
+	                                        vqc
+#else
+	real(sp), intent(inout), dimension(1-o_halo:kp+o_halo) :: vqr, vqc
+#endif
+	real(sp), dimension(1-o_halo:kp+o_halo) :: t
 	! coalescence efficiencies
 	real(sp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
 	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
@@ -1068,7 +1454,7 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! some commonly used variables that depend on prognostics                            !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    t=theta*(p/1.e5_sp)**(ra/cp) ! temperature
+    t=(theta+th)*(p/1.e5_sp)**(ra/cp) ! temperature
     rho=p / (ra*t) ! air density    
     rho_fac=(rho0/rho(1:kp))**0.5_sp
     ! rain n0, lambda
@@ -1121,11 +1507,12 @@
 		!q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
 		q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
     	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
-
+        
         des_dt=dfridr(svp_liq,t(k),1.e0_sp,err)
         dqs_dt=eps1*p(k)*des_dt/(p(k)-svp_liq(t(k)))**2
         qold=q(k,iqc)
         qtot=q(k,1)+q(k,iqc)
+
 		
         q(k,iqc)=q(k,1)+q(k,iqc)-smr(k)
         if (theta_flag) q(k,iqc)=(q(k,iqc)+(lv/cp*qold)*dqs_dt) / (1._sp+lv/cp*dqs_dt)
@@ -1508,48 +1895,50 @@
 
 
      
-    if (theta_flag) theta=t*(1.e5_sp/p)**(ra/cp)
+    if (theta_flag) th=t*(1.e5_sp/p)**(ra/cp)-theta
 
 
 
-    
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! advection rain 0th order Bott, a.k.a. upstream advection                           !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! rain 
-    if(sum(q(1:kp,cst(cat_r)+1)).gt.qsmall) then
-		where(isnan(vqr))
-			vqr=0._sp
-		end where
-		vqr(-o_halo:0)=vqr(1)
-		vqr(kp+1:kp+o_halo)=vqr(kp)
-		n_step=max(ceiling(maxval(vqr(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
-		vqr(-o_halo:kp+o_halo-1)=-vqr(-o_halo+1:kp+o_halo)
-		do iter=1,n_step
-            call mpdata_vec_1d(dt/real(n_step,sp),dz,dzn,&
-                            rho,rhon,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
-                            vqr(-o_halo+1:kp+o_halo),&
-                            q(:,cst(cat_r):cen(cat_r)),1,.false.,.false.)		
-        enddo
-	endif
     ! cloud 
     if(sum(q(1:kp,cst(cat_c)+1)).gt.qsmall) then
+        adv_l(1)=.true.
 		where(isnan(vqc))
 			vqc=0._sp
 		end where
-		vqc(-o_halo:0)=vqc(1)
 		vqc(kp+1:kp+o_halo)=vqc(kp)
-		n_step=max(ceiling(maxval(vqc(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
-		vqc(-o_halo:kp+o_halo-1)=-vqc(-o_halo+1:kp+o_halo)
-		do iter=1,n_step
-            call mpdata_vec_1d(dt/real(n_step,sp),dz,dzn,&
+		n_step(1)=max(ceiling(maxval(vqc(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
+		vqc(1-o_halo:kp+o_halo-1)=-vqc(-o_halo+2:kp+o_halo)
+#if MPI_PAMM == 0
+		do iter=1,n_step(1)
+            call mpdata_vec_1d(dt/real(n_step(1),sp),dz,dzn,&
                             rho,rhon,kp,cen(cat_c)-cst(cat_c)+1,o_halo,o_halo,&
                             vqc(-o_halo+1:kp+o_halo),&
                             q(:,cst(cat_c):cen(cat_c)),1,.false.,.false.)		
         enddo
+#endif	
+	endif
+    ! rain 
+    if(sum(q(1:kp,cst(cat_r)+1)).gt.qsmall) then
+        adv_l(2)=.true.
+		where(isnan(vqr))
+			vqr=0._sp
+		end where
+		vqr(kp+1:kp+o_halo)=vqr(kp)
+		n_step(2)=max(ceiling(maxval(vqr(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
+		vqr(1-o_halo:kp+o_halo-1)=-vqr(-o_halo+2:kp+o_halo)
+#if MPI_PAMM == 0
+		do iter=1,n_step(2)
+            call mpdata_vec_1d(dt/real(n_step(2),sp),dz,dzn,&
+                            rho,rhon,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
+                            vqr(-o_halo+1:kp+o_halo),&
+                            q(:,cst(cat_r):cen(cat_r)),1,.false.,.false.)		
+        enddo
+#endif	
 	endif
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	
     
 
     end subroutine p_microphysics_1d
