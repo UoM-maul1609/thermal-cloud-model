@@ -7,12 +7,12 @@ CLEANDIRS = $(BAM_DIR) $(SFVT_DIR) ./
 
 
 DEBUG = -fbounds-check -g
-MPI    =#-DMPI1
+MPI_PAMM   = 0
 OPT    =-O3
 
 
-FOR = gfortran -c  
-FOR2 = gfortran  
+FOR = mpif90 -c  
+FOR2 = mpif90  
 
 AR = ar 
 RANLIB = ranlib 
@@ -58,7 +58,7 @@ zbrent.$(OBJ)	: zbrent.f90
 advection_1d.$(OBJ) : advection_1d.f90 
 	$(FOR) advection_1d.f90 $(FFLAGS)advection_1d.$(OBJ)
 microphysics.$(OBJ) : microphysics.f90 advection_1d.$(OBJ) dfridr.$(OBJ) bam_code sfvt_code
-	$(FOR) microphysics.f90 $(FFLAGS)microphysics.$(OBJ) -I$(BAM_DIR) -I$(SFVT_DIR)
+	$(FOR) microphysics.f90 -cpp -DMPI_PAMM=$(MPI_PAMM) $(FFLAGS)microphysics.$(OBJ) -I$(BAM_DIR) -I$(SFVT_DIR)
 hygfx.$(OBJ) : hygfx.for 
 	$(FOR) hygfx.for $(FFLAGS)hygfx.$(OBJ) 
 
