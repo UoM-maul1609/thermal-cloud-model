@@ -237,7 +237,7 @@
     do k=1,3
 	    call hygfx(a, b, real(k,sp)+alpha_s+1.0_sp,0.5_sp,f1)
 	    call hygfx(a, b, real(k,sp)+alpha_s+b_s+1.0_sp, 0.5_sp,f2)
-	    isnow=isnow+c(k)*(f1/(real(k,sp)+alpha_s)+f2/(real(k,sp)+alpha_s+b_s))
+	    isnow=isnow+c(k)*(f1/(real(k,sp)+alpha_s)-f2/(real(k,sp)+alpha_s+b_s))
 	enddo
 	isnow=a_s*pi*gamma(b)/(2._sp**(6._sp+2._sp*alpha_s+b_s)) * isnow
 	
@@ -248,7 +248,7 @@
     do k=1,3
 	    call hygfx(a, b, real(k,sp)+alpha_i+1.0_sp,0.5_sp,f1)
 	    call hygfx(a, b, real(k,sp)+alpha_i+b_i+1.0_sp, 0.5_sp,f2)
-	    iice=iice+c(k)*(f1/(real(k,sp)+alpha_i)+f2/(real(k,sp)+alpha_i+b_i))
+	    iice=iice+c(k)*(f1/(real(k,sp)+alpha_i)-f2/(real(k,sp)+alpha_i+b_i))
 	enddo
 	iice=a_i*pi*gamma(b)/(2._sp**(6._sp+2._sp*alpha_i+b_i)) * iice
 	
@@ -300,14 +300,14 @@
 	!>@param[inout] theta: theta 
 	!>@param[inout] p: pressure
 	!>@param[inout] z: vertical levels 
-	!>@param[inout] t: temperature 
+	!>@param[in] theta_ref: reference potential temperature 
 	!>@param[inout] rho: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] theta_flag: whether to alter theta
-    subroutine microphysics_2d(nq,ip,kp,o_halo,dt,dz,q,precip,theta,p, z,t,rho,w, &
+    subroutine microphysics_2d(nq,ip,kp,o_halo,dt,dz,q,precip,theta,p, z,theta_ref,rho,w, &
     						micro_init,hm_flag, mass_ice,theta_flag)
     implicit none
     ! arguments:
@@ -316,8 +316,8 @@
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,1:ip,4), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
-    					theta, p, t, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo) :: z
+    					theta, p, rho
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
@@ -328,7 +328,7 @@
 	
 	do i=1,ip
 		call microphysics_1d(nq,kp,o_halo,dt,dz,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
-							z(:),t(:,i),rho(:,i),w(:,i), &
+							z(:),theta_ref,rho(:,i),w(:,i), &
     						micro_init,hm_flag, mass_ice,theta_flag)
     enddo
 
@@ -346,17 +346,17 @@
 	!>@param[in] o_halo: extra points for advection
 	!>@param[inout] q: q-variables 
 	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
-	!>@param[inout] theta: theta 
+	!>@param[inout] th: theta perturbation
 	!>@param[inout] p: pressure
-	!>@param[inout] z: vertical levels 
-	!>@param[inout] t: temperature 
+	!>@param[in] z: vertical levels 
+	!>@param[inout] theta: potential temperature 
 	!>@param[inout] rho: density 
 	!>@param[in] u: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] theta_flag: whether to alter theta
-    subroutine microphysics_1d(nq,kp,o_halo,dt,dz,q,precip,theta,p, z,t,rho,u, &
+    subroutine microphysics_1d(nq,kp,o_halo,dt,dz,q,precip,th,p, z,theta,rho,u, &
     						micro_init,hm_flag, mass_ice, theta_flag)
 	use advection_1d
 	use nr, only : dfridr
@@ -366,8 +366,8 @@
     real(sp), intent(in) :: dt,dz
     real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,4), intent(inout) :: precip
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: theta, p, z, t, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: p, th, rho
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u, z, theta
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice
@@ -420,7 +420,8 @@
 
     real(sp), dimension(kp) :: n_r, lam_r, n_i, lam_i, n_s, lam_s, n_g, lam_g
     real(sp), dimension(kp) :: rho_fac
-	real(sp), dimension(-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vnr, vns, vng, vni
+	real(sp), dimension(1-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vnr, vns, vng, vni
+	real(sp), dimension(1-o_halo:kp+o_halo) :: t
 	! coalescence efficiencies
 	real(sp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
 	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1
@@ -487,7 +488,7 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! some commonly used variables that depend on prognostics                            !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    t=theta*(p/1e5_sp)**(ra/cp) ! temperature
+    t=(theta+th)*(p/1e5_sp)**(ra/cp) ! temperature
     rho=p / (ra*t) ! air density    
     rho_fac=(rho0/rho(1:kp))**0.5_sp
     ! rain n0, lambda
@@ -949,7 +950,7 @@
     			(psaut+pgaci+psaci+pisub+pifrw+pimlt+praci_g+praci_s))*dt
     			
     q=max(q,0._sp)	    
-    if (theta_flag) theta=t*(1.e5_sp/p)**(ra/cp)
+    if (theta_flag) th=t*(1.e5_sp/p)**(ra/cp)-theta
     
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! advection rain 0th order Bott, a.k.a. upstream advection                           !
@@ -957,12 +958,12 @@
     ! rain 
     if(sum(q(1:kp,3)).gt.qsmall) then
 		where(isnan(vqr))
-			vqr=0_sp
+			vqr=0._sp
 		end where
-		vqr(-o_halo:0)=vqr(1)
+		vqr(1-o_halo:0)=vqr(1)
 		vqr(kp+1:kp+o_halo)=vqr(kp)
 		n_step=max(ceiling(maxval(vqr)*dt/dz*2_sp),1)
-		vqr(-o_halo:kp+o_halo-1)=-vqr(-o_halo+1:kp+o_halo)
+		vqr(1-o_halo:kp+o_halo-1)=-vqr(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqr,q(:,3),.false.)
 		enddo
@@ -971,22 +972,22 @@
     ! graupel 
     if(sum(q(1:kp,5)).gt.qsmall) then
 		where(isnan(vqg))
-			vqg=0_sp
+			vqg=0._sp
 		end where
-		vqg(-o_halo:0)=vqg(1)
+		vqg(1-o_halo:0)=vqg(1)
 		vqg(kp+1:kp+o_halo)=vqg(kp)
 		n_step=max(ceiling(maxval(vqg)*dt/dz*2_sp),1)
-		vqg(-o_halo:kp+o_halo-1)=-vqg(-o_halo+1:kp+o_halo)
+		vqg(1-o_halo:kp+o_halo-1)=-vqg(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqg,q(:,5),.false.)
 		enddo
 		where(isnan(vng))
-			vng=0_sp
+			vng=0._sp
 		end where
-		vng(-o_halo:0)=vng(1)
+		vng(1-o_halo:0)=vng(1)
 		vng(kp+1:kp+o_halo)=vng(kp)
 		n_step=max(ceiling(maxval(vng)*dt/dz*2_sp),1)
-		vng(-o_halo:kp+o_halo-1)=-vng(-o_halo+1:kp+o_halo)
+		vng(1-o_halo:kp+o_halo-1)=-vng(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vng,q(:,9),.false.)
 		enddo
@@ -995,22 +996,22 @@
     ! snow 
     if(sum(q(1:kp,4)).gt.qsmall) then
 		where(isnan(vqs))
-			vqs=0_sp
+			vqs=0._sp
 		end where
-		vqs(-o_halo:0)=vqs(1)
+		vqs(1-o_halo:0)=vqs(1)
 		vqs(kp+1:kp+o_halo)=vqs(kp)
 		n_step=max(ceiling(maxval(vqs)*dt/dz*2_sp),1)
-		vqs(-o_halo:kp+o_halo-1)=-vqs(-o_halo+1:kp+o_halo)
+		vqs(1-o_halo:kp+o_halo-1)=-vqs(-o_halo+2:kp+o_halo)
 		do iter=1,n_step		
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqs,q(:,4),.false.)
 		enddo
 		where(isnan(vns))
-			vns=0_sp
+			vns=0._sp
 		end where
-		vns(-o_halo:0)=vns(1)
+		vns(1-o_halo:0)=vns(1)
 		vns(kp+1:kp+o_halo)=vns(kp)
 		n_step=max(ceiling(maxval(vns)*dt/dz*2_sp),1)
-		vns(-o_halo:kp+o_halo-1)=-vns(-o_halo+1:kp+o_halo)
+		vns(1-o_halo:kp+o_halo-1)=-vns(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vns,q(:,8),.false.)
 		enddo
@@ -1018,22 +1019,22 @@
     ! ice
     if(sum(q(1:kp,6)).gt.qsmall) then     
 		where(isnan(vqi))
-			vqi=0_sp
+			vqi=0._sp
 		end where
-		vqi(-o_halo:0)=vqi(1)
+		vqi(1-o_halo:0)=vqi(1)
 		vqi(kp+1:kp+o_halo)=vqi(kp)
 		n_step=max(ceiling(maxval(vqi)*dt/dz*2_sp),1)
-		vqi(-o_halo:kp+o_halo-1)=-vqi(-o_halo+1:kp+o_halo)
+		vqi(1-o_halo:kp+o_halo-1)=-vqi(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqg,q(:,6),.false.)
 		enddo
 		where(isnan(vni))
-			vni=0_sp
+			vni=0._sp
 		end where
-		vni(-o_halo:0)=vni(1)
+		vni(1-o_halo:0)=vni(1)
 		vni(kp+1:kp+o_halo)=vni(kp)
 		n_step=max(ceiling(maxval(vni)*dt/dz*2_sp),1)
-		vni(-o_halo:kp+o_halo-1)=-vni(-o_halo+1:kp+o_halo)
+		vni(1-o_halo:kp+o_halo-1)=-vni(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
 			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vng,q(:,7),.false.)
 		enddo
