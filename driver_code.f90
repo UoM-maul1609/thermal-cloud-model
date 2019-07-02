@@ -108,11 +108,13 @@
     ! local variables
     integer(i4b) :: nt, i, j, l,m,nsteps, iter
     real(sp) :: time, time_last_output, output_time
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: rhoa
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: rhoa,theta_ref
 
     
     ! fudge because dynamics is solenoidal for rhoa=const
     rhoa=1._sp
+    theta_ref=0._sp
+    
     time_last_output=-output_interval
     output_time=output_interval
 
@@ -288,14 +290,14 @@
         if (microphysics_flag .eq. 1) then
 			call microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
-						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
+						   zn(:),theta_ref,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
 						   theta_flag)		
 						   
 						   
 		else if (microphysics_flag .eq. 2) then
 			call w_microphysics_2d(nq,ip,kp,o_halo,dt,dz,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
-						   zn(:),t,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
+						   zn(:),theta_ref,rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
 						   theta_flag)		
 						   
 		else if (microphysics_flag .eq. 3) then
@@ -303,7 +305,8 @@
 			                cat_am,cat_c, cat_r, &
                             ip,kp,o_halo,dt,dz2,dz2,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
-						   zn(:),t,rho(:,:),rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
+						   zn(:),theta_ref,&
+						   rho(:,:),rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
 						   theta_flag)		
 						   
 		endif       
