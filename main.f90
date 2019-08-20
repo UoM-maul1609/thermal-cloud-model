@@ -98,11 +98,13 @@
             case(3) ! pamm
                 call read_in_pamm_bam_namelist(bam_nmlfile,aero_nmlfile, &
                     aero_prof_flag, &
+                    ice_flag, &
                     grid1%q_name,grid1%q_type,grid1%c_s,grid1%c_e,grid1%nq,&
                     grid1%ncat, &
                     grid1%nprec, grid1%n_mode, &
-                    grid1%iqv, grid1%iqc, grid1%inc, grid1%cat_am, &
-                    grid1%cat_c, grid1%cat_r)    
+                    grid1%iqv, grid1%iqc, grid1%inc, grid1%iqr,grid1%inr,&
+                    grid1%iqi,grid1%ini,grid1%iai,grid1%cat_am, &
+                    grid1%cat_c, grid1%cat_r,grid1%cat_i)    
 			case default
 				print *, 'error'
 				stop

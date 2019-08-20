@@ -17,7 +17,7 @@
             ! variables for grid
             integer(i4b) :: n_levels,nq,ncat, nprec, &
                             iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
-                            cat_am, cat_c, cat_r
+                            cat_am, cat_c, cat_r,cat_i,iai
             real(sp) :: dx,dz, dt, &
                 zbase,ztop
             real(sp), dimension(:,:,:), allocatable :: q, qold, precip
@@ -71,7 +71,7 @@
         logical :: monotone=.true.,viscous_dissipation=.false.,theta_flag=.false., &
         			hm_flag=.true., aero_prof_flag=.true., &
         			adjust_thermal_flag=.false., &
-        			offset_equal_zbase=.false.
+        			offset_equal_zbase=.false.,ice_flag=.false.
 		integer(i4b) :: advection_scheme=0,microphysics_flag=0, above_cloud=0
 		character (len=200) :: bam_nmlfile = ' '
 		character (len=200) :: aero_nmlfile = ' '
