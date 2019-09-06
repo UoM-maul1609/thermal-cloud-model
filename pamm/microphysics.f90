@@ -97,7 +97,8 @@
 				nu_r1,nu_r2,nu_i1, nu_i2, nu_s1, nu_s2, nu_g1, nu_g2, &
 				mass_imm, num_imm, q0sat, &
 				chi_rain, chi_cloud, chi_ice, chi_snow, chi_graupel, &
-				chi_rain1, chi_cloud1, chi_ice1, chi_snow1, chi_graupel1
+				chi_rain1, chi_cloud1, chi_ice1, chi_snow1, chi_graupel1, &
+				chi_num_ice, chi_num_ice1
 				
 	! Seifert and Beheng autoconversion
 	real(sp) :: kc, kr, xstar
@@ -412,8 +413,12 @@
         inc=(n_mode-1)*6+3
         iqc=(n_mode-1)*6+4       
         
-        nprec=1
-
+        if(ice_flag) then
+            nprec=2
+        else
+            nprec=1
+        endif
+        
         iqv=1
         
         cat_am=(n_mode-1)+2
@@ -1018,12 +1023,14 @@
 	chi_rain=gamma(1._sp+alpha_r+b_r+dr)
 	chi_cloud=gamma(1._sp+alpha_c+b_c+1._sp)
 	chi_ice=gamma(1._sp+alpha_i+b_i+di)
+	chi_num_ice=gamma(1._sp+alpha_i+b_i)
 	chi_snow=gamma(1._sp+alpha_s+b_s+ds)
 	chi_graupel=gamma(1._sp+alpha_g+b_g+dg)
 	
 	chi_rain1=gamma(1._sp+alpha_r+dr)
 	chi_cloud1=gamma(1._sp+alpha_c+1._sp)
 	chi_ice1=gamma(1._sp+alpha_i+di)
+	chi_num_ice1=gamma(1._sp+alpha_i)
 	chi_snow1=gamma(1._sp+alpha_s+ds)
 	chi_graupel1=gamma(1._sp+alpha_g+dg)
 	
@@ -1048,6 +1055,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] ip,jp: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
@@ -1068,6 +1076,7 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
+                    nprec, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
 #else
@@ -1084,6 +1093,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] ip,jp: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
@@ -1105,6 +1115,7 @@
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
+                    nprec, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
     				comm,comm_vert,id,dims,coords)
@@ -1117,11 +1128,11 @@
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,jp,kp, inc, iqc, inr,iqr,&
         ini,iqi,iai, &
         cat_am,&
-        cat_c, cat_r,cat_i,l_h,r_h
+        cat_c, cat_r,cat_i,l_h,r_h, nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1-l_h:jp+r_h,1-l_h:ip+r_h,1), intent(inout) :: precip
+    real(sp), dimension(1:kp,1-l_h:jp+r_h,1-l_h:ip+r_h,nprec), intent(inout) :: precip
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(inout) :: &
     					th
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
@@ -1153,7 +1164,7 @@
 	    do j=1,jp
 #if MPI_PAMM == 0 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr, ini,iqi,iai,&
-		                cat_am,cat_c, cat_r, cat_i,&
+		                cat_am,cat_c, cat_r, cat_i,nprec,&
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
@@ -1161,7 +1172,7 @@
 #else
 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
-		                cat_am,cat_c, cat_r, cat_i, &
+		                cat_am,cat_c, cat_r, cat_i,nprec, &
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
@@ -1295,6 +1306,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r,cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] ip: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
@@ -1313,18 +1325,18 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
-                    cat_am,cat_c, cat_r, cat_i,&
+                    cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, theta_flag)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, inr,iqr, &
         ini,iqi,iai, &
-        cat_am,cat_c, cat_r, cat_i
+        cat_am,cat_c, cat_r, cat_i,nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1:ip,1), intent(inout) :: precip
+    real(sp), dimension(1:kp,1:ip,1:nprec), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
     					theta, p,rho
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
@@ -1351,13 +1363,13 @@
 	do i=1,ip
 #if MPI_PAMM == 0 
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
-		                cat_am,cat_c, cat_r, cat_i,&
+		                cat_am,cat_c, cat_r, cat_i,nprec,&
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, .false., theta_flag)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
-		                cat_am,cat_c, cat_r, cat_i, &
+		                cat_am,cat_c, cat_r, cat_i,nprec, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
 							vqc(:,i),vqr(:,i),vqi(:,i), n_step, adv_l, coords,&
@@ -1386,6 +1398,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
 	!>@param[in] dz: dz, dzn
@@ -1405,7 +1418,7 @@
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
-                            cat_am,cat_c, cat_r, cat_i, &
+                            cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
     						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
 #else
@@ -1421,6 +1434,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
 	!>@param[in] dz: dz, dzn
@@ -1442,7 +1456,7 @@
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
-                            cat_am,cat_c, cat_r, cat_i,&
+                            cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
                             vqc,vqr,vqi,n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
@@ -1455,11 +1469,11 @@
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat,n_mode, kp, o_halo, inc, iqc,inr,iqr,&
                              ini,iqi,iai, &
-                            cat_am,cat_c, cat_r, cat_i
+                            cat_am,cat_c, cat_r, cat_i,nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1), intent(inout) :: precip
+    real(sp), dimension(1:kp,nprec), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: th
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
                                                     rhon, theta,p
@@ -1636,6 +1650,11 @@
         ! ice
         vqi(:)=min(max(fall_q_i*rho_fac * lam_i**(1._sp+alpha_i+di) / &
             (lam_i+f_i)**(1._sp+alpha_i+di+b_i), 0._sp), 10._sp)
+
+        ! precipitation
+        precip(1:kp,2)=n_i(1:kp)*(a_i*chi_num_ice/(lam_i(1:kp)**(alpha_i+b_i+1._sp)) - &
+                        u(1:kp)*chi_num_ice1/(lam_i(1:kp)**(alpha_i+1._sp))) &
+                        /rho(1:kp)
     endif
     
     ! precipitation
@@ -1851,7 +1870,7 @@
                 ln_part_mom(3,dcrit2(n_mode),n_mix, &
                             sig_aer1(n_mode),d_aer1(n_mode))
                             
-            q(k,cst(cat_am))=q(k,cst(cat_am))-dummy1 !n_mix
+            q(k,cst(cat_am))=q(k,cst(cat_am))*(1._sp-min(dummy1/n_mix,1._sp))
             do i=1,n_mode-1 ! deplete aerosol
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! add to aerosol particles in cloud water                                !
@@ -2173,10 +2192,10 @@
             
                     if(q(k,1).gt.smr_i(k)) then
                         pisub(k)=0._sp
-                        pidep(k)=max(ice_dep,0._sp)
+                        pidep(k)=min(max(ice_dep,0._sp),q(k,1)-smr_i(k))
                     else
                         pidep(k)=0._sp
-                        pisub(k)=-min(ice_dep,0._sp)
+                        pisub(k)=min(-min(ice_dep,0._sp),q(k,iqi)/dt)
                     endif
                     !!!
                 
@@ -2213,6 +2232,58 @@
         ! end rain auto-conversion                                                       !		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! collection of cloud by ice                                                     !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if ((t(k).le.ttr).and.ice_flag) then
+		    if((q(k,iqc).gt.qsmall) .and. (q(k,iqi).gt.qsmall)) then
+                piacw(k)=max(mass_iacw * n_i(k)* eiw *q(k,iqc)*rho_fac(k) / &
+                        (lam_i(k)+f_i)**(3._sp+b_i+alpha_i),0._sp)
+                
+                dummy1=q(k,iqi) ! total mass of particle
+                
+                piacw(k)=max(min(piacw(k),q(k,iqc)/dt),0._sp)
+                
+            endif
+		endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! ice aggregation see Ferrier (1994)                                             !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(ice_flag.and.(t(k).lt.ttr)) then
+		    ! collisions
+		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
+                    lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+            ! aggregation rate
+            riaci(k)=eii(k)*dummy1
+            dummy2=dummy1*(1._sp-eii(K))*3._sp*dt
+            q(k,ini)=q(k,ini)+dummy2
+            q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! end ice aggregation                                                            !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! melting of ice                                                                 !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if((t(k).gt.ttr).and.ice_flag) then
+			pimlt(k)=q(k,iqi)/dt+ &
+			    (pidep(k)-pisub(k)+piacw(k)) ! ice melts instantaneously
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! end melting of ice                                                             !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     enddo
     
     
@@ -2221,12 +2292,17 @@
     ! update variables
     ! vapour mass
     q(1:kp,1)=q(1:kp,1)+(pgsub+pssub+pisub-(psdep+pidep+piprm+pgdep))*dt
-    ! ice mass
-    if(ice_flag) q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
+    ! ice mass and number
+    if(ice_flag) then 
+        q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
+        q(1:kp,iqi+4)=q(1:kp,iqi)+(-pisub)*dt
+        q(1:kp,ini)=q(1:kp,ini)-(riaci)*dt
+    endif
 
     		
-    ! liquid mass 
-    q(1:kp,iqc)=q(1:kp,iqc)-((pgacw+praut+psacw+pracw+piacw+pihal+picnt+pifrw))*dt
+    ! liquid mass - riming not done here
+    q(1:kp,iqc)=q(1:kp,iqc)-((pgacw+praut+psacw+pracw+pihal+picnt+pifrw))*dt
+    
 
 
     ! rain number
@@ -2236,7 +2312,7 @@
     ! rain mass
     q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
     			(pgacr+pgfr+psacr+piacr_g+piacr_s))*dt
-    ! treat rain evaporation separately - 
+    ! treat rain evaporation separately - adjust
     prevp=min(prevp,q(1:kp,cst(cat_r)+1)/dt) 
     
 
@@ -2286,7 +2362,6 @@
 
 
     do k=1,kp
-
         if((prevp(k) .gt. 0._sp)) then
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! add up the total number of aerosol in rain - all modes
@@ -2366,10 +2441,133 @@
     enddo
     
 
+    ! metling ice!
+    do k=1,kp
+        if((pimlt(k) .gt. 0._sp)) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! add up the total number of aerosol in ice - all modes
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            dummy1=0._sp
+            do i=1,n_mode-1
+                dummy1=dummy1+q(k,iai+(i-1)*3)
+            enddo
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-    t(1:kp)=t(1:kp)-lv/cp*prevp*dt+lf/cp*pifrw*dt+lf/cp*pgfr*dt+ls/cp*(pidep-pisub)*dt
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! calculate the number conc. of ice melted
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            dummy2=pimlt(k)*(q(k,cst(cat_i))/(qsmall+q(k,cst(cat_i)+1)))*dt
+            dummy2=min(dummy2,q(k,cst(cat_i)))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+            if(dummy2 .lt. qsmall) cycle
+
+
+
+        
+
+            do i=1,n_mode-1
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! add aerosol in melting ice water back to aerosol
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                ! this is number in aerosol, plus number in ice 
+                !  (scaled by fraction in composition category)
+                ! aer_in_ice * ice_num_evap / ice_num
+                q(k,cst(cat_r)+(i-1)*3+2)      = &
+                    q(k,cst(cat_r)+(i-1)*3+2)   + &
+                    q(k,iai+(i-1)*3) * &
+                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                    
+                ! this is surface area going into rain aerosol
+                q(k,cst(cat_r)+(i-1)*3+3)    = &
+                    q(k,cst(cat_r)+(i-1)*3+3) +&
+                    q(k,iai+(i-1)*3+1) * &
+                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                ! this is mass going into rain aerosol
+                q(k,cst(cat_r)+(i-1)*3+4)    = &
+                    q(k,cst(cat_r)+(i-1)*3+4) +&
+                    q(k,iai+(i-1)*3+2) * &
+                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                
+                ! aerosol in ice
+!                 q(k,iai+(i-1)*3)=q(k,iai+(i-1)*3)* &
+!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                     
+!                 q(k,iai+(i-1)*3+1)=q(k,iai+(i-1)*3+1)* &
+!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                     
+!                 q(k,iai+(i-1)*3+2)=q(k,iai+(i-1)*3+2)* &
+!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+                    
+            enddo
+            ! add the number of ice and mass to the rain
+            q(k,cst(cat_r))=q(k,cst(cat_r))+dummy2
+            ! mass already added
+!             q(k,cst(cat_r)+1)=q(k,cst(cat_r)+1)+pimlt(k)*dt
+            ! ice properties
+            q(k,cst(cat_i):cen(cat_i)) = q(k,cst(cat_i):cen(cat_i)) * &
+                (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp ))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(t(k) > ttr) q(k,cst(cat_i):cen(cat_i))=0._sp
+        endif
+        
+    enddo
+
+ 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! trial and error shows that riming can sometimes cause problems if it warms above 
+    ! ttr. So adjust temperature in two places
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    t(1:kp)=t(1:kp)-lv/cp*prevp*dt+lf/cp*pifrw*dt+lf/cp*pgfr*dt+ls/cp*(pidep-pisub)*dt- &
+                lf/cp*(pimlt)*dt
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! do the riming here                                                                 !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if(ice_flag) then
+        do k=1,kp
+            if((q(k,iqc).lt.qsmall).or.(t(k).gt.ttr)) cycle
+
+            dummy1=q(k,iqc)
+            
+            ! limit riming so 0.1 times liquid water or to a temperature 
+            ! that will not raise above the melting point
+            piacw(k)=max(min(piacw(k),dummy1/dt*0.1_sp,(ttr-t(k))*cp/lf)/dt*0.5_sp,0._sp)
+            ! riming
+            q(k,iqi)=q(k,iqi)+piacw(k)*dt
+            q(k,iqi+4)=q(k,iqi+4)+piacw(k)*dt
+
+            ! and the aerosol
+            ! increase ice aerosol
+            q(k,iai:cen(cat_i))=q(k,iai:cen(cat_i))+ &
+                q(k,cst(cat_c)+2:cen(cat_c))*piacw(k)*dt/dummy1
+            ! reduce cloud props
+            q(k,cst(cat_c):cen(cat_c))=q(k,cst(cat_c):cen(cat_c))* &
+                max(1._sp- piacw(k)*dt/dummy1,0._sp)
+        enddo
+    endif
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+    
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! adjust temperature due to riming                                                   !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    t(1:kp)=t(1:kp)+lf/cp*(piacw)*dt
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)-prevp*dt
+    
     q(1:kp,1)=q(1:kp,1)+(prevp)*dt
 
     q=max(q,0._sp)	
