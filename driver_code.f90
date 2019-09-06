@@ -302,7 +302,7 @@
 						   
 		else if (microphysics_flag .eq. 3) then
 			call p_microphysics_2d(nq,ncat,n_mode,c_s,c_e, inc, iqc,-1,-1,&
-			                -1,-1,-1,cat_am,cat_c, cat_r, -1,&
+			                -1,-1,-1,cat_am,cat_c, cat_r, -1,1,&
                             ip,kp,o_halo,dt,dz2,dz2,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
 						   zn(:),theta_ref,&
