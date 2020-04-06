@@ -1337,12 +1337,15 @@
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice on /off
+	!>@param[in] wr_flag: warm rain on /off
+	!>@param[in] rm_flag: riming on /off
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
-    						micro_init,hm_flag, mass_ice, ice_flag,theta_flag, &
+    						micro_init,hm_flag, mass_ice, ice_flag, &
+    						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag)
     implicit none
     ! arguments:
@@ -1358,7 +1361,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
                     rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
-    logical, intent(in) :: hm_flag, ice_flag, theta_flag
+    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag
     integer(i4b), intent(in) :: ice_nuc_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1384,7 +1387,7 @@
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
-    						.true.,.true.,theta_flag, &
+    						wr_flag,rm_flag,theta_flag, &
     						j_stochastic,ice_nuc_flag)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
@@ -1393,7 +1396,7 @@
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
 							vqc(:,i),vqr(:,i),vqi(:,i), n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice, ice_flag, &
-    						.true.,.true.,theta_flag, &
+    						wr_flag,rm_flag,theta_flag, &
     						j_stochastic,ice_nuc_flag)
     	n_step_o=max(n_step_o,n_step)
 #endif	
