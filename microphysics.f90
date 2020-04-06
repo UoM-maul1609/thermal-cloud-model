@@ -81,7 +81,8 @@
 						egw=1._sp, eiw=1._sp, egs_wet=1._sp, egi_wet=1._sp
 	
 	! variables used in various process rates:
-	real(sp) :: gam1r,gam2r,gam1c, gam2c, gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
+	real(sp) :: gam1r,gam2r,gam3r,gam1c, gam2c, gam3c, &
+	            gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
 				fall_q_r, fall_q_c, fall_q_s, fall_q_g, fall_n_r, fall_n_s, fall_n_g, &
 				fall_q_i, fall_n_i, fall_n_c, &
 				phi_r, mass_iacr,num_iacr, mass_sacw_i, mass_iacw, &
@@ -897,9 +898,12 @@
 	! used to calculate intercept and slopes
 	gam1r=gamma(1._sp+alpha_r)
 	gam2r=gamma(1._sp+alpha_r+dr)
+	gam3r=gamma(5._sp+alpha_r)
 	gam1c=gamma(1._sp+alpha_c)
 	gam2c=gamma(1._sp+alpha_c+1._sp) ! note the 1, instead of dc - drop distribution
 	                                ! is a mass distribution
+	gam3c=gamma(4._sp/dc+alpha_c+1._sp) ! note different to rain 
+	                                    !because cloud is a mass distribution
 	gam1i=gamma(1._sp+alpha_i)
 	gam2i=gamma(1._sp+alpha_i+di)
 	gam1s=gamma(1._sp+alpha_s)
@@ -1074,11 +1078,13 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
+	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
-    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
+    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    				j_stochastic,ice_nuc_flag)
 #else
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
@@ -1112,12 +1118,14 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
+	!>@param[in] j_stochastic, ice_nuc_flag
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    				j_stochastic,ice_nuc_flag, &
     				comm,comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
@@ -1139,8 +1147,9 @@
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
     logical, intent(in) :: ice_flag, hm_flag, theta_flag
+    integer(i4b), intent(in) :: ice_nuc_flag
     logical , intent(inout) :: micro_init
-    real(sp), intent(in) :: mass_ice
+    real(sp), intent(in) :: mass_ice, j_stochastic
 
 	! locals
 	integer(i4b) :: i,j,n, error,n1
@@ -1168,7 +1177,8 @@
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
-    						micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
+    						micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    						j_stochastic,ice_nuc_flag)
 #else
 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
@@ -1178,7 +1188,8 @@
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
 							vqc(:,j,i),vqr(:,j,i),vqi(:,j,i),n_step, adv_l, &
 							coords, &
-    						micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
+    						micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    						j_stochastic,ice_nuc_flag)
     		n_step_o=max(n_step,n_step_o)
 
     		adv_l_o=adv_l_o .or. adv_l ! if there has been a true at any point, 
@@ -1324,10 +1335,12 @@
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] theta_flag: whether to alter theta
+	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
-    						micro_init,hm_flag, mass_ice, theta_flag)
+    						micro_init,hm_flag, mass_ice, theta_flag, &
+    						j_stochastic,ice_nuc_flag)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, inr,iqr, &
@@ -1343,8 +1356,9 @@
                     rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, theta_flag
+    integer(i4b), intent(in) :: ice_nuc_flag
     logical , intent(inout) :: micro_init
-    real(sp), intent(in) :: mass_ice
+    real(sp), intent(in) :: mass_ice, j_stochastic
 
 
 	! locals
@@ -1366,14 +1380,16 @@
 		                cat_am,cat_c, cat_r, cat_i,nprec,&
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
-    						micro_init,hm_flag, mass_ice, .false., theta_flag)
+    						micro_init,hm_flag, mass_ice, .false., theta_flag, &
+    						j_stochastic,ice_nuc_flag)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
 		                cat_am,cat_c, cat_r, cat_i,nprec, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
 							vqc(:,i),vqr(:,i),vqi(:,i), n_step, adv_l, coords,&
-    						micro_init,hm_flag, mass_ice, .false., theta_flag)
+    						micro_init,hm_flag, mass_ice, .false., theta_flag, &
+    						j_stochastic,ice_nuc_flag)
     	n_step_o=max(n_step_o,n_step)
 #endif	
 	enddo
@@ -1417,10 +1433,12 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
+	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
-    						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
+    						micro_init,hm_flag, mass_ice,ice_flag, theta_flag, &
+    						j_stochastic,ice_nuc_flag)
 #else
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -1455,11 +1473,13 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
+	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
                             vqc,vqr,vqi,n_step, adv_l, coords,&
-    						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
+    						micro_init,hm_flag, mass_ice,ice_flag, theta_flag, &
+    						j_stochastic,ice_nuc_flag)
 #endif
 
 	use advection_1d
@@ -1479,8 +1499,9 @@
                                                     rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, ice_flag, theta_flag
+    integer(i4b), intent(in) :: ice_nuc_flag
     logical , intent(inout) :: micro_init
-    real(sp), intent(in) :: mass_ice
+    real(sp), intent(in) :: mass_ice, j_stochastic
     ! locals:
     integer(i4b) :: k,k1,iter, i
 #if MPI_PAMM == 1
@@ -1561,7 +1582,7 @@
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot
 	
 	real(sp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density
-	real(sp) :: phi,vol
+	real(sp) :: phi,vol, nfrag=0._sp, lam_freeze, n0_freeze
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
@@ -1953,20 +1974,37 @@
                 call ice_nucleation_aerosol(nin_c,din_c, &
                     n_mix, &    ! number
                     sig_aer1(n_mode), &  ! sigma 
-                    d_aer1(n_mode), t(k) ,q(k  ,ini))     ! d
-             
-                ! increase ice crystal number
-                q(k  ,ini)=q(k  ,ini)+nin_c
-                ! increase ice crystal mass
-                dummy1=nin_c/q(k  ,inc)*q(k, iqc)
-                q(k  ,iqi)=q(k  ,iqi)+dummy1
+                    d_aer1(n_mode), t(k) ,q(k  ,ini), &
+                    j_stochastic,dt,ice_nuc_flag)     ! d
+
                 
+                
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! drop fragmentation                                                     !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                nfrag=0._sp
+                dummy1=nin_c/q(k  ,inc)*q(k, iqc) ! mass of cloud water frozen
+                if(t(k).lt.268._sp) then
+                    lam_freeze=(q(k,  inc)/dummy1*gam2c/gam1c)
+                    n0_freeze = q(k,  inc)/gam1c*lam_freeze**(alpha_c+1)
+                    ! lawson et al
+                    nfrag = 2.5e13_sp*n0_freeze/(cc**(4._sp/dc))* &
+                        gam3c/(lam_freeze**(4._sp/dc+1._sp+alpha_c))
+                endif
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                
+                
+                ! increase ice crystal number
+                q(k  ,ini)=q(k  ,ini)+nfrag
+                ! increase ice crystal mass - added divided by number of cloud, 
+                                ! multiplied by mass of cloud
+                q(k  ,iqi)=q(k  ,iqi)+dummy1
                 ! increase ice crystal shape factor
-                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_c
+                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_c+nfrag
                 ! increase ice crystal volume factor
                 q(k  ,iqi+2)=q(k  ,iqi+2)+dummy1/rhoi
                 ! increase ice crystal monomers
-                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_c
+                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_c+nfrag
                 
                 
                 ! deplete cloudnc
@@ -2025,7 +2063,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! ice nucleation from rain water                                             !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if(q(k,cst(cat_r)) > 0._sp) then
+            if(q(k,cst(cat_r)) > 1._sp) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! ice nucleation via immersion                                           !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2051,20 +2089,35 @@
                 call ice_nucleation_aerosol(nin_r,din_r, &
                     n_mix, &    ! number
                     sig_aer1(n_mode), &  ! sigma 
-                    d_aer1(n_mode), t(k), q(k  ,ini) )     ! d
+                    d_aer1(n_mode), t(k), q(k  ,ini) , &
+                    j_stochastic, dt, ice_nuc_flag)     ! d
             
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! drop fragmentation                                                     !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                nfrag=0._sp
+                dummy1=nin_r/q(k  ,inr)*q(k, iqr) ! mass of rain water frozen
+                if(t(k).lt.268._sp) then
+                    lam_freeze=(q(k,  inr)/dummy1*gam2r/gam1r)**(1._sp/dr)
+                    n0_freeze = q(k,  inr)/gam1r*lam_freeze**(alpha_r+1)
+                    ! lawson et al
+                    nfrag = 2.5e13_sp*n0_freeze* &
+                        gam3r/(lam_freeze**(5._sp+alpha_r))
+                endif
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
                 ! increase in ice crystal number
-                q(k  ,ini)=q(k  ,ini)+nin_r
+                q(k  ,ini)=q(k  ,ini)+nin_r+nfrag
                 ! increase in ice crystal mass
-                dummy1=nin_r/q(k  ,inr)*q(k, iqr)
                 q(k  ,iqi)=q(k  ,iqi)+dummy1
                 
                 ! increase ice crystal shape factor
-                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_r
+                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_r+nfrag
                 ! increase ice crystal volume factor
                 q(k  ,iqi+2)=q(k  ,iqi+2)+dummy1/rhoi
                 ! increase ice crystal monomers
-                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_r
+                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_r+nfrag
 
 
                 ! deplete rain
@@ -2254,15 +2307,23 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! ice aggregation see Ferrier (1994)                                             !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(ice_flag.and.(t(k).lt.ttr)) then
+		if(ice_flag.and.(t(k).lt.ttr).and.(lam_i(k).lt.1.e5_sp)) then
 		    ! collisions
 		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
                     lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+                        
+            
             ! aggregation rate
             riaci(k)=eii(k)*dummy1
-            dummy2=dummy1*(1._sp-eii(K))*3._sp*dt
+            
+            ! Vardiman approximate - 3 particles for every collision that doesn't aggregate
+            dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
+
             q(k,ini)=q(k,ini)+dummy2
             q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
+            
+            
+            
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! end ice aggregation                                                            !
@@ -2898,25 +2959,43 @@
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief calculate the number of active INPs and the threshold diameter for 
 	!> activation
-	!>@param[in] n_aer,sig_aer,d_aer,T,icen
+	!>@param[in] flag for type of nucleation 1=demott, 2=stochastic....
+	!>@param[in] n_aer,sig_aer,d_aer,T,icen, j_stochastic, dt
 	!>@param[inout] nin,din
     subroutine ice_nucleation_aerosol(nin,din, &
                 n_aer, &    ! number
                 sig_aer, &  ! sigma 
-                d_aer, t ,icen)     ! d
+                d_aer, t ,icen, &
+                j_stochastic, dt,ice_nuc_flag)     ! d
     use nrtype
     implicit none
+    integer(i4b), intent(in) :: ice_nuc_flag
     real(sp), intent(inout) :: nin, din
-    real(sp), intent(in) :: n_aer,sig_aer,d_aer, t,icen
+    real(sp), intent(in) :: n_aer,sig_aer,d_aer, t,icen, &
+                        j_stochastic,dt
 
     real(sp) :: naer05, x, arg
 
-
-    naer05=ln_part_mom(0,0.5e-6_sp,n_aer,sig_aer,d_aer)
-    ! source function
-    nin=demott_2010(t,naer05)
-    ! limit nucleation
-    nin=max(nin-icen,0._sp)
+    if(ice_nuc_flag.eq.1) then
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! DeMott 2010 nucleation                         !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        naer05=ln_part_mom(0,0.5e-6_sp,n_aer,sig_aer,d_aer)
+        ! source function
+        nin=demott_2010(t,naer05)
+        ! limit nucleation
+        nin=max(nin-icen,0._sp)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    elseif(ice_nuc_flag.eq.2) then
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! basic stochastic nucleation                    !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        nin=j_stochastic*n_aer*dt
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    endif    
+    
+    
+    
 
     ! deplete aerosol up to this diameter - using erfinv
     ! limit the argument so that it is not equal to -1 or +1
@@ -2932,7 +3011,7 @@
     ! but x is equal to log(d/dm)/(sig_aer*sqrt(2))
     din=exp(x*sig_aer*sqrt(2._sp)+log(d_aer))
     
-    if(din<0.5e-6_sp) din=0.5e-6_sp
+    if((din<0.5e-6_sp) .and. (ice_nuc_flag.eq.1)) din=0.5e-6_sp
     
     end subroutine ice_nucleation_aerosol
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
