@@ -24,6 +24,8 @@
 	aero_nmlfile='pamm/namelist.in', ! filename of aerosol profile namelist
 	aero_prof_flag=.false., ! flag to read in a profile of aerosol
 	hm_flag=.true.,	     ! switch hm process on / off
+	wr_flag=.true.,	     ! switch warm rain process on / off
+	rm_flag=.true.,	     ! switch riming process on / off
 	theta_flag=.true.,  ! advect theta
 	drop_num_init=.true., ! only works for microphysics_flag=2
 	num_drop=300.e6, ! initial drop number concentration

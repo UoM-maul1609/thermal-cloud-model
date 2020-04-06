@@ -40,7 +40,10 @@
 	!>@param[in] monotone - flag for monotonic advection
 	!>@param[in] viscous_dissipation - flag for smagorinsky-lilly scheme
 	!>@param[in] microphysics_flag - flag for calling microphysics
+	!>@param[in] ice_flag - flag for ice microphysics on / off
 	!>@param[in] hm_flag - flag for switching on / off hm process
+	!>@param[in] wr_flag - flag for switching on / off warm rain process
+	!>@param[in] rm_flag - flag for switching on / off riming process
 	!>@param[in] theta_flag - flag for advecting theta dry
 	!>@param[in] mass_ice - mass of a single ice crystal (override)
 	!>@param[in] output_interval - output interval
@@ -65,7 +68,8 @@
                                u,w,delsq, vis, &
                                new_file,micro_init,advection_scheme, monotone, &
                                viscous_dissipation, &
-                               microphysics_flag,hm_flag,theta_flag,mass_ice, &
+                               microphysics_flag,ice_flag, hm_flag,wr_flag, rm_flag, &
+                               theta_flag,mass_ice, &
                                output_interval, &
                                ! variables associated with thermal properties
                                k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & 
@@ -96,7 +100,8 @@
     real(sp), dimension(1:kp,1:ip), intent(inout) :: delsq
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: vis
     logical, intent(inout) :: new_file, micro_init,therm_init
-    logical, intent(in) :: monotone,hm_flag,theta_flag, viscous_dissipation
+    logical, intent(in) :: monotone,ice_flag, hm_flag,wr_flag, rm_flag, &
+                        theta_flag, viscous_dissipation
     integer(i4b), intent(in) :: microphysics_flag
     real(sp), intent(in) :: mass_ice
     
@@ -307,7 +312,7 @@
 							theta(:,:),p(:,:), &
 						   zn(:),theta_ref,&
 						   rho(:,:),rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
-						   theta_flag,0.0_sp,1)		
+						   ice_flag, wr_flag, rm_flag,theta_flag,0.0_sp,1)		
 						   
 		endif       
 

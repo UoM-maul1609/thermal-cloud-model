@@ -48,7 +48,8 @@
                     nq, nprec, &
         			advection_scheme, ord, halo, &
         			monotone, viscous_dissipation, microphysics_flag, ice_flag, &
-        			bam_nmlfile, aero_nmlfile, aero_prof_flag, hm_flag, theta_flag, &
+        			bam_nmlfile, aero_nmlfile, aero_prof_flag, hm_flag, &
+        			wr_flag, rm_flag, theta_flag, &
         			drop_num_init, num_drop, ice_init, &
         			num_ice, mass_ice
         namelist /run_vars2/ q_type, q_init
@@ -187,7 +188,8 @@
 							io1%new_file, &
                             micro_init,advection_scheme, &
                             monotone,viscous_dissipation, &
-                            microphysics_flag,hm_flag,theta_flag, &
+                            microphysics_flag,ice_flag, hm_flag,wr_flag, rm_flag, &
+                            theta_flag, &
                             mass_ice, &
                             output_interval, &
                             k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & ! variables associated 
