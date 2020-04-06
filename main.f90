@@ -47,7 +47,7 @@
                     output_interval, cvis, &
                     nq, nprec, &
         			advection_scheme, ord, halo, &
-        			monotone, viscous_dissipation, microphysics_flag, &
+        			monotone, viscous_dissipation, microphysics_flag, ice_flag, &
         			bam_nmlfile, aero_nmlfile, aero_prof_flag, hm_flag, theta_flag, &
         			drop_num_init, num_drop, ice_init, &
         			num_ice, mass_ice
@@ -105,6 +105,9 @@
                     grid1%iqv, grid1%iqc, grid1%inc, grid1%iqr,grid1%inr,&
                     grid1%iqi,grid1%ini,grid1%iai,grid1%cat_am, &
                     grid1%cat_c, grid1%cat_r,grid1%cat_i)    
+                    
+                    nq=grid1%nq
+                    nprec=grid1%nprec                      
 			case default
 				print *, 'error'
 				stop
