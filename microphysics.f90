@@ -1026,7 +1026,7 @@
 		n_step=max(ceiling(maxval(vqi)*dt/dz*2_sp),1)
 		vqi(1-o_halo:kp+o_halo-1)=-vqi(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqg,q(:,6),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vqi,q(:,6),.false.)
 		enddo
 		where(isnan(vni))
 			vni=0._sp
@@ -1036,7 +1036,7 @@
 		n_step=max(ceiling(maxval(vni)*dt/dz*2_sp),1)
 		vni(1-o_halo:kp+o_halo-1)=-vni(-o_halo+2:kp+o_halo)
 		do iter=1,n_step
-			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vng,q(:,7),.false.)
+			call bott_scheme_1d(kp,0,o_halo,dt/real(n_step,sp),dz,z,vni,q(:,7),.false.)
 		enddo
 	endif
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

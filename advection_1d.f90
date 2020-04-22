@@ -81,8 +81,8 @@
 		endif
 
 		! get coefficients for interpolation
-		call coeff_bott_scheme_1d(psi_old,a_coeff01,j,ord,o_halo)
-		call coeff_bott_scheme_1d(psi_old,a_coeff02,j-1,ord,o_halo)
+		call coeff_bott_scheme_1d(psi_old,a_coeff01,j)
+		call coeff_bott_scheme_1d(psi_old,a_coeff02,j-1)
 
 		! step 1: calculate the monotone fluxes
 		f_plus(j)=0._sp
@@ -154,8 +154,8 @@
 		endif
 
 		! get coefficients for interpolation
-		call coeff_bott_scheme_1d(psi_old,a_coeff01,j,ord,o_halo)
-		call coeff_bott_scheme_1d(psi_old,a_coeff02,j+1,ord,o_halo)
+		call coeff_bott_scheme_1d(psi_old,a_coeff01,j)
+		call coeff_bott_scheme_1d(psi_old,a_coeff02,j+1)
 		f_minus(j-1)=0._sp
 		f_m=0._sp
 		! step 1: calculate the monotone fluxes
@@ -204,8 +204,8 @@
 	do j=kp+1,0,-1 
 		! step 4: continued... apply the second condition of positive definite
 		! flux limiter for divergent flows
-		call coeff_bott_scheme_1d(psi_old,a_coeff01,j,ord,o_halo)
-		call coeff_bott_scheme_1d(psi_old,a_coeff02,j+1,ord,o_halo)
+		call coeff_bott_scheme_1d(psi_old,a_coeff01,j)
+		call coeff_bott_scheme_1d(psi_old,a_coeff02,j+1)
 		i_jp1=0._sp
 		i_j=0._sp
 		do k=0,ord
@@ -235,12 +235,12 @@
 
 
 	contains
-	subroutine coeff_bott_scheme_1d(q,a_coeff,j,ord,o_halo)
+	subroutine coeff_bott_scheme_1d(q,a_coeff,j)
 		use nrtype
 		implicit none
 		real(sp), intent(in), dimension(-o_halo+1:kp+1+o_halo) :: q
 		real(sp), intent(inout), dimension(1:ord+1) :: a_coeff
-		integer(i4b), intent(in) :: j,ord,o_halo
+		integer(i4b), intent(in) :: j
 
 		! table 1: bott, mwr 1989.
 		a_coeff(1)=q(j) ! same for all cases
