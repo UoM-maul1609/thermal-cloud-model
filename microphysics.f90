@@ -529,7 +529,7 @@
     lam_r=(max(q(1:kp,5),1._sp)*cr*gam2r / (max(q(1:kp,3),1.e-10_sp)*gam1r))**(1._sp/dr)
     n_r=rho(1:kp)*max(q(1:kp,5),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
     ! cloud n0, lambda    
-    lam_c=(max(q(1:kp,4),1._sp)*cc*gam2c / (max(q(1:kp,2),1.e-10_sp)*gam1c))**(1._sp/1._sp)
+    lam_c=(max(q(1:kp,4),1._sp)*gam2c / (max(q(1:kp,2),1.e-10_sp)*gam1c))**(1._sp/1._sp)
     n_c=rho(1:kp)*max(q(1:kp,4),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
 
     
