@@ -26,8 +26,8 @@
 	!>@param[in] dt - timestep
 	!>@param[in] cvis: coefficient for viscosity
 	!>@param[in] c_s, c_e: start and end indices for a category
-	!>@param[in] inc, iqc: indices for cloud number and mass
-	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
+	!>@param[in] inc, iqc, inr, iqr, ini, iqi, iai: indices for cloud number and mass
+	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain, ice
 	!>@param[in] q_name: name of categories
 	!>@param[in] dx,dz - grid spacing
 	!>@param[in] dx2,dz2 - grid spacing
@@ -61,8 +61,8 @@
                                ip,kp,ord,o_halo,runtime, &
                                dt,cvis,  &
                                c_s, c_e, &
-                               inc, iqc, &
-                               cat_am,cat_c, cat_r, &
+                               inc, iqc,   inr, iqr, ini, iqi, iai, &
+                               cat_am,cat_c, cat_r,   cat_i, &
                                q_name, &
                                q,qold, precip,theta,th_old, p,dx,dz,dx2,dz2,x,xn,z,zn,t,rho,&
                                u,w,delsq, vis, &
@@ -86,7 +86,8 @@
 
     implicit none
     integer(i4b), intent(in) :: nq,nprec,ncat, ip,kp, ord, o_halo, advection_scheme, &
-                                inc, iqc, n_mode, cat_am,cat_c, cat_r
+                        inc, iqc, inr, iqr, ini, iqi, iai, &
+                        n_mode, cat_am,cat_c, cat_r, cat_i
     real(sp), intent(in) :: runtime, output_interval, dt, dx,dz, cvis
     integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
     character(len=20), dimension(nq) :: q_name
@@ -306,8 +307,8 @@
 						   theta_flag)		
 						   
 		else if (microphysics_flag .eq. 3) then
-			call p_microphysics_2d(nq,ncat,n_mode,c_s,c_e, inc, iqc,-1,-1,&
-			                -1,-1,-1,cat_am,cat_c, cat_r, -1,1,&
+			call p_microphysics_2d(nq,ncat,n_mode,c_s,c_e, inc, iqc,inr,iqr,&
+			                ini,iqi,iai,cat_am,cat_c, cat_r, cat_i,nprec,&
                             ip,kp,o_halo,dt,dz2,dz2,q(:,:,:),precip(:,:,:),&
 							theta(:,:),p(:,:), &
 						   zn(:),theta_ref,&
