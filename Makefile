@@ -9,8 +9,8 @@ FOR2 = gfortran
 AR = ar 
 RANLIB = ranlib 
 OBJ = o
-FFLAGS = $(OPT)  $(DEBUG)  -o 
-FFLAGS2 =  $(DEBUG) -O0 -o 
+FFLAGS = $(OPT) -w $(DEBUG)  -o 
+FFLAGS2 =  $(DEBUG) -w -O3 -o 
 
 
 micro_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
