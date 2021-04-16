@@ -166,7 +166,7 @@
 
  	precip=0._sp
     ! set up vertical level array
-    z=dz*(/(i,i=-o_halo,kp+o_halo-1)/)+dz/2._sp
+    z=dz*(/(i,i=-o_halo,kp+o_halo-1)/) +dz
     zn=z-0.5_sp*dz
     ! set up horizontal level array
     x=dx*(/(i,i=-o_halo,ip+o_halo-1)/)!-0.5_sp*dx

@@ -125,7 +125,7 @@
 
     ! calculate the thermal properties
 	if(therm_init) then
-		zc=zn(2)-z_offset !0._sp !500._sp
+		zc=zn(1)-z_offset !0._sp !500._sp
 		alpha1=1._sp/ttr
 		!k=2.e-3_sp                      ! changes the width
 		!dsm_by_dz_z_eq_zc=-1.6e-6_sp    ! 
@@ -162,14 +162,14 @@
 			! equation 42 of ZZRA:
 ! 			phi=zz*xx
 			! u and w winds
-				zc=zn(2) !-z_offset
+				zc=zn(1) !-z_offset
 				test3=((z(j)-z_offset)-zc)
 				test1=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
 				test1=-n_bar_mac/k*(z_bar+test3-k1*test3**2)/sqrt(test1) &
 						*sin(k*xn(i+1))
 									
-				zc=zn(2) !-z_offset
+				zc=zn(1) !-z_offset
 				test3=((zn(j+1)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
@@ -183,7 +183,7 @@
 ! 				u(j,i)=u(j,i)-imag(test1)
 ! 				w(j,i)=w(j,i)-imag(test2)
 				! w on centred points
-				zc=z(2) !-z_offset
+				zc=z(1) !-z_offset
 				test3=((z(j+1)-z_offset)-zc)
 				test2=small1+2._sp*test3*(z_bar+test3/2._sp- &
 							 k1/3._sp*test3**2._sp)
