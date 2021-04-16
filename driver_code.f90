@@ -313,7 +313,7 @@
 							theta(:,:),p(:,:), &
 						   zn(:),theta_ref,&
 						   rho(:,:),rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
-						   ice_flag, wr_flag, rm_flag,theta_flag,0.0_sp,1)		
+						   ice_flag, wr_flag, rm_flag,theta_flag,0.0_sp,1,0,.false.)		
 						   
 		endif       
 
