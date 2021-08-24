@@ -72,7 +72,7 @@
 	!>@param[inout] q, qold, 
 	!>@param[in] iqv,iqc,inc,iqi,ini
 	!>@param[inout] precip, theta, th_old, 
-	!>             pressure, x,xn,z,zn, temperature, rho,u,w, delsq, vis
+	!>             pressure, x,xn,z,zn, temperature, rho,u,w, delsq, vis, tke
 	!>@param[in] drop_num_init: flag to initialise number of drops where liquid water>0
 	!>@param[in] number conc of drops #/kg
 	!>@param[in] ice_init: flag to initialise ice crystals in model
@@ -87,7 +87,7 @@
                              ip,kp,o_halo,dx,dz,dx2,dz2,q,qold, &
                              iqv,iqc,inc,iqi,ini,&
                              precip,theta,th_old, p,x,xn,z,zn,t,rho,u,w,&
-                             delsq, vis, &
+                             delsq, vis, tke, &
                              drop_num_init, num_drop, &
                              ice_init, num_ice, mass_ice, &
                              zbase,ztop, &
@@ -114,7 +114,7 @@
     real(sp), intent(inout) :: zbase, ztop
     real(sp), dimension(:,:), allocatable, intent(inout) :: theta, th_old, &
                                                      p, t, rho,u, w,delsq, &
-                                                            vis
+                                                            vis, tke
     real(sp), dimension(:), allocatable, intent(inout) :: x, z,xn,zn, dx2, dz2
     real(sp), dimension(:,:,:), allocatable, intent(inout) :: q, qold, precip
     integer(i4b), intent(in) :: iqv, iqc, inc, iqi, ini
@@ -161,6 +161,8 @@
     allocate( delsq(1:kp,1:ip), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( vis(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( tke(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 
 

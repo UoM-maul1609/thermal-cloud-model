@@ -22,7 +22,7 @@
                 zbase,ztop
             real(sp), dimension(:,:,:), allocatable :: q, qold, precip
             real(sp), dimension(:,:), allocatable :: theta, th_old, &
-                p, rho, t, u, w,delsq, vis
+                p, rho, t, u, w,delsq, vis, tke
             real(sp), dimension(:), allocatable :: x,z,xn,zn, dx2, dz2
 
             ! point to the start and end of a category

@@ -315,7 +315,7 @@
 		integer(i4b), intent(in) :: ip,kp,o_halo
 		real(sp), intent(in) :: dt,dx,dz
 		real(sp), intent(inout), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
-																				f, vis
+			f, vis
 		real(sp), intent(inout), dimension(1:kp,1:ip) :: delsq
 		
 		real(sp), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: f2
@@ -357,7 +357,7 @@
 	!>@param[in] dx,dz
 	!>calculates smagorinsky-lilly viscosity:
 	!>\f$ visco = C_s^2\Delta x\Delta y|S|\f$
-    subroutine smagorinsky(ip,kp,o_halo,cvis,u,w,vis,dx,dz)
+    subroutine smagorinsky(ip,kp,o_halo,cvis,u,w,vis,tke,dx,dz)
 
 		use nrtype
 		implicit none
@@ -365,10 +365,11 @@
 		real(sp), intent(in) :: cvis, dx, dz
 		real(sp), intent(in), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: &
 																		u,w
-		real(sp), intent(inout), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: vis
+		real(sp), intent(inout), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: vis, tke
 		! local variables:
 		integer(i4b) :: j, i,k
 		real(sp), dimension(1-o_halo:kp+o_halo,1-o_halo:ip+o_halo) :: strain
+		real(sp) :: c_k ! kolmogorov constant, scale with dimensionality
 			
 		
 		
@@ -397,9 +398,13 @@
             enddo
         enddo
         
+	c_k = 1.0 ! choose according to dimensionality of the problem
         
         vis(1:kp,1:ip) = cvis**2*dx*dz*&
                         sqrt( 0.5_sp*(strain(1:kp,1:ip)+strain(0:kp-1,1:ip)) )
+
+	tke(1:kp,1:ip) = 1.5_sp*c_k*(0.5_sp*(strain(1:kp,1:ip)+strain(0:kp-1,1:ip)))*dx*dz*&
+			(cvis**2/pi)**(2.0_sp/3.0_sp)
 
 	end subroutine smagorinsky
 		

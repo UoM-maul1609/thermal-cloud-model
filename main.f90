@@ -61,8 +61,6 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-        print *,'Running the Thermal Cloud Model (TCM)'
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! read in namelists													   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -75,6 +73,8 @@
         read(8,nml=thermal_vars)
         close(8)
         o_halo=ord+2 !ord+1
+
+	print *,'Running the Thermal Cloud Model (TCM) - outputting to ', outputfile
 
 
 
@@ -134,7 +134,7 @@
                             grid1%precip, &
                             grid1%theta, grid1%th_old, grid1%p,grid1%x,grid1%xn, &
                             grid1%z,grid1%zn,grid1%t,grid1%rho,grid1%u,grid1%w, &
-                            grid1%delsq,grid1%vis, &
+                            grid1%delsq,grid1%vis, grid1%tke, &
                             drop_num_init, num_drop, ice_init, num_ice, mass_ice, &
                             grid1%zbase,grid1%ztop, &
                             microphysics_flag, above_cloud)
@@ -185,7 +185,7 @@
         					grid1%precip,grid1%theta, grid1%th_old, &
                             grid1%p,dx,dz,grid1%dx2,grid1%dz2,&
                             grid1%x,grid1%xn,grid1%z,grid1%zn,&
-							grid1%t,grid1%rho,grid1%u,grid1%w,grid1%delsq,grid1%vis, &
+							grid1%t,grid1%rho,grid1%u,grid1%w,grid1%delsq,grid1%vis,grid1%tke,  &
 							io1%new_file, &
                             micro_init,advection_scheme, &
                             monotone,viscous_dissipation, &
@@ -200,7 +200,7 @@
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-		print *,'TCM has finished'
+		print *,'TCM has finished for ', outputfile
     end program main
 
 

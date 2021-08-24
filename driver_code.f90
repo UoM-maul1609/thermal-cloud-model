@@ -32,7 +32,7 @@
 	!>@param[in] dx,dz - grid spacing
 	!>@param[in] dx2,dz2 - grid spacing
 	!>@param[inout] q, qold, theta, th_old, pressure, 
-	!>          x,xn,z,zn, temperature, rho, u,w, delsq, vis
+	!>          x,xn,z,zn, temperature, rho, u,w, delsq, vis, tke
 	!>@param[inout] precip
 	!>@param[inout] new_file
 	!>@param[inout] micro_init - flag to initialise microphysics
@@ -65,7 +65,7 @@
                                cat_am,cat_c, cat_r,   cat_i, &
                                q_name, &
                                q,qold, precip,theta,th_old, p,dx,dz,dx2,dz2,x,xn,z,zn,t,rho,&
-                               u,w,delsq, vis, &
+                               u,w,delsq, vis, tke, &
                                new_file,micro_init,advection_scheme, monotone, &
                                viscous_dissipation, &
                                microphysics_flag,ice_flag, hm_flag,wr_flag, rm_flag, &
@@ -99,7 +99,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
                                     theta, th_old, p, t,rho,u,w
     real(sp), dimension(1:kp,1:ip), intent(inout) :: delsq
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: vis
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: vis, tke
     logical, intent(inout) :: new_file, micro_init,therm_init
     logical, intent(in) :: monotone,ice_flag, hm_flag,wr_flag, rm_flag, &
                         theta_flag, viscous_dissipation
@@ -132,9 +132,11 @@
 
 		
     	! wind / thermal properties:
+	if (i == 1) then
 		call thermal_2d(time,ip,kp,o_halo,k,dsm_by_dz_z_eq_zc, &
 						b,del_gamma_mac,del_c_s,del_c_t, &
     						epsilon_therm,x,xn,z,zn,dx,dz,u,w,w_peak,z_offset, therm_init)   	
+	endif
 
         if (time-time_last_output >= output_interval) then
             ! output:
@@ -142,7 +144,7 @@
                             precip(1:kp,1:ip,:), &
                             theta(1:kp,1:ip),p(1:kp,1:ip), &
                             x(1:ip),xn(1:ip),z(1:kp),zn(1:kp), &
-                            t(1:kp,1:ip),u(1:kp,1:ip),w(1:kp,1:ip),new_file)
+                            t(1:kp,1:ip),u(1:kp,1:ip),w(1:kp,1:ip),tke(1:kp,1:ip),new_file)
             time_last_output=time
         endif
 
@@ -249,7 +251,7 @@
         ! mixing                                                                         !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(viscous_dissipation) then
-            call smagorinsky(ip,kp,o_halo,cvis,u,w,vis,dx,dz)
+            call smagorinsky(ip,kp,o_halo,cvis,u,w,vis,tke,dx,dz)
             call set_halos_2d(ip,kp,o_halo,vis)
             do l=1,5
                 call set_halos_2d(ip,kp,o_halo,theta)  

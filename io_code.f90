@@ -20,7 +20,7 @@
 	!>@param[in] q, precip, theta, pressure, x,xn,z,zn, temperature,u,w
 	!>@param[inout] new_file
     subroutine output_2d(time,nq,nprec,ip,kp,q_name, &
-                        q,precip,theta,p,x,xn,z,zn,t,u,w,new_file)
+                        q,precip,theta,p,x,xn,z,zn,t,u,w,tke,new_file)
 
     use nrtype
     use netcdf
@@ -32,7 +32,7 @@
     character(len=20), dimension(nq) :: q_name
     real(sp), dimension(kp,ip,nq), intent(in) :: q
     real(sp), dimension(kp,ip,nprec), intent(in) :: precip
-    real(sp), dimension(kp,ip), intent(in) :: theta, p, t, u, w
+    real(sp), dimension(kp,ip), intent(in) :: theta, p, t, u, w, tke
     real(sp), dimension(ip), intent(in) :: x,xn
     real(sp), dimension(kp), intent(in) :: z,zn
     logical, intent(inout) :: new_file
@@ -186,6 +186,15 @@
         call check( nf90_put_att(io1%ncid, io1%a_dimid, &
                     "units", "ms-1") )
 
+	!define variable tke
+	call check( nf90_def_var(io1%ncid, "tke", NF90_DOUBLE, &
+		(/io1%k_dimid, io1%i_dimid, io1%x_dimid/), io1%varid) )
+	! get id to a_dimid
+	call check( nf90_inq_varid(io1%ncid, "tke", io1%a_dimid) )
+	! units
+	call check (nf90_put_att(io1%ncid, io1%a_dimid, &
+			"units", "m2 s-2") )
+
         call check( nf90_enddef(io1%ncid) )
         call check( nf90_close(io1%ncid) )
 
@@ -258,6 +267,11 @@
     call check( nf90_inq_varid(io1%ncid, "w", io1%varid ) )
     call check( nf90_put_var(io1%ncid, io1%varid, w, &
                 start = (/1,1,io1%icur/)))
+
+    ! write variable: tke
+    call check( nf90_inq_varid(io1%ncid, "tke", io1%varid) )
+    call check( nf90_put_var(io1%ncid, io1%varid, tke, &
+		start = (/1,1,io1%icur/)))
 
     ! write variable: t
     call check( nf90_inq_varid(io1%ncid, "t", io1%varid ) )
