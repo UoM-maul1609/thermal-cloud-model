@@ -1209,15 +1209,17 @@
         enddo
     enddo
     ! cloud moments
+    ! see https://journals.ametsoc.org/view/journals/atsc/68/7/2011jas3645.1.xml
+    ! equation 17 - modified gamma distribution
     moms=0._sp
     do i=1-l_h,ip+r_h
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
-                ! zeroth  
+                ! zeroth - number
                 if (q(k,j,i,inc).lt.1._sp) cycle
                 if (q(k,j,i,iqc).lt.1.e-20_sp) cycle
                 moms(k,j,i,1)=rhoan(k)*q(k,j,i,inc)
-                ! first  
+                ! first 
                 moms(k,j,i,2)=ngs(k,j,i,1)*gam1cr / &
                     (cc**(1._sp/dc)*lamgs(k,j,i,1)**(alpha_c+1._sp+1._sp/dc))
                 ! second  
@@ -1235,11 +1237,12 @@
                 ! calculate the ratio p M1/M0*M2/M3
                 p=moms(k,j,i,2)/moms(k,j,i,1)* &
                     moms(k,j,i,3)/moms(k,j,i,4)
+                ! p=(alpha + 1) / (alpha+3)
                 ! mu    
                 mugs(k,j,i,1)=(1._sp-3._sp*p) / (p-1._sp)
-                ! now calculate ratio of m1 : m0
+                ! now calculate ratio of m0 : m1
                 p=moms(k,j,i,1) / moms(k,j,i,2)
-                ! lambda
+                ! lambda from this ratio
                 lamgs(k,j,i,1)=p*(mugs(k,j,i,1)+1._sp)
                 ! n0
                 ngs(k,j,i,1)=lamgs(k,j,i,1)**(mugs(k,j,i,1)+1._sp)*moms(k,j,i,1) / &
@@ -1313,21 +1316,21 @@
 	!>@param[inout] rho, rhon: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
-	!>@param[in] hm_flag: switch hm-process on and off
+	!>@param[in] hm_flag, wr_flag: switch hm-process and warm rain on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, 
-	!>@param[in] coll_breakup_flag1,heyms_west, calc_params
+	!>@param[in] coll_breakup_flag1,heyms_west, lawson, recycle, calc_params
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q, &
                     nrad,ngs,lamgs,mugs, &
                     precip,th,prefn, z,thetan,rhoa,rhoan,w, &
-    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    				micro_init,hm_flag, wr_flag, mass_ice, ice_flag, theta_flag, &
     				j_stochastic,ice_nuc_flag,mode2_ice_flag, &
-    				coll_breakup_flag1, heyms_west, calc_params)
+    				coll_breakup_flag1, heyms_west, lawson, recycle, calc_params)
 #else
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
@@ -1358,12 +1361,12 @@
 	!>@param[inout] rho, rhon: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
-	!>@param[in] hm_flag: switch hm-process on and off
+	!>@param[in] hm_flag, wr_flag: switch hm-process and warm rain on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, 
-	!>@param[in] coll_breakup_flag1, heyms_west, calc_parms
+	!>@param[in] coll_breakup_flag1, heyms_west, lawson, recycle, calc_parms
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
@@ -1371,9 +1374,9 @@
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,&
                     nrad,ngs,lamgs,mugs, &
                     th,prefn, z,thetan,rhoa,rhoan,w, &
-    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    				micro_init,hm_flag, wr_flag, mass_ice, ice_flag, theta_flag, &
     				j_stochastic,ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1, &
-    				heyms_west, calc_params, &
+    				heyms_west, lawson, recycle, calc_params, &
     				comm,comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
@@ -1394,7 +1397,8 @@
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
-    logical, intent(in) :: ice_flag, hm_flag, theta_flag, calc_params, heyms_west
+    logical, intent(in) :: ice_flag, hm_flag, wr_flag, theta_flag, calc_params, &
+        heyms_west, lawson, recycle
     integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1413,7 +1417,7 @@
     integer(i4b), dimension(3), intent(in) :: coords, dims
     real(sp), dimension(nq) :: lbc,ubc
     logical, dimension(3) :: adv_lg, adv_l=[.false.,.false.,.false.], &
-                    adv_l_o=[.false.,.false.,.false.]
+                    adv_l_o=[.false.,.false.,.false.], adv_lgg
 
     n_step=1
     n_step_o=1
@@ -1430,9 +1434,9 @@
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
-    						.true.,.true.,theta_flag, &
+    						wr_flag,.true.,theta_flag, &
     						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
-    						coll_breakup_flag1, heyms_west)
+    						coll_breakup_flag1, heyms_west, lawson, recycle)
 #else
 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
@@ -1443,9 +1447,9 @@
 							vqc(:,j,i),vqr(:,j,i),vqi(:,j,i),vni(:,j,i),n_step, adv_l, &
 							coords, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
-    						.true.,.true.,theta_flag, &
+    						wr_flag,.true.,theta_flag, &
     						j_stochastic,ice_nuc_flag, mode2_ice_flag, &
-    						coll_breakup_flag1, heyms_west)
+    						coll_breakup_flag1, heyms_west, lawson, recycle)
     		n_step_o=max(n_step,n_step_o)
 
     		adv_l_o=adv_l_o .or. adv_l ! if there has been a true at any point, 
@@ -1454,15 +1458,17 @@
     	enddo
 	enddo
 	
-	! collective communication
+	! collective communication - no longer really need this because
+	! vertical levels are not parallelised
+	! (but you may want to keep the option of parallelising over the vertical)
+	! normally the communicator should be comm_vert
+	! but there is problem in the code  when exchange_full is called
+	! because not all processors might be there (due to if statements)
 #if MPI_PAMM == 1
 	call mpi_allreduce(adv_l_o(1:3),adv_lg(1:3),3,MPI_LOGICAL,MPI_LOR, comm_vert,error)
 	call mpi_allreduce(n_step_o(1:3),n_step_g(1:3),3,MPI_INTEGER,MPI_MAX, comm_vert,error)
+	call mpi_allreduce(adv_l_o(1:3),adv_lgg(1:3),3,MPI_LOGICAL,MPI_LOR, comm,error)
 #endif
-    
-    
-    
-    
     
 
 
@@ -1483,7 +1489,7 @@
     enddo
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
+    ! Vert communications
     if(adv_lg(1)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
                                 vqc(:,:,:),0._sp,0._sp,dims,coords)
@@ -1496,14 +1502,6 @@
                     1,.false., 2,comm_vert, id, &
                     dims,coords)
         enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! full exchange needed                                                           !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do n1=cst(cat_c),cen(cat_c)
-            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
-        enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     endif       
     if(adv_lg(2)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
@@ -1519,14 +1517,6 @@
                     dims,coords) 
 
         enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! full exchange needed                                                           !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do n1=cst(cat_r),cen(cat_r)
-            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
-        enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     endif       
     if(adv_lg(3)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
@@ -1542,6 +1532,33 @@
                     dims,coords) 
 
         enddo
+    endif
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    ! comm - communications
+    if(adv_lgg(1)) then
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! full exchange needed                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do n1=cst(cat_c),cen(cat_c)
+            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+    endif
+           
+    if(adv_lgg(2)) then
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! full exchange needed                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do n1=cst(cat_r),cen(cat_r)
+            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    endif
+           
+    if(adv_lgg(3)) then
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! full exchange needed                                                           !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1550,7 +1567,8 @@
                                     q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    endif       
+    endif
+           
 #endif
 
     if (calc_params) then
@@ -1604,14 +1622,14 @@
 	!>@param[in] rm_flag: riming on /off
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, 
-	!>@param[in] coll_breakup_flag1, heyms_west
+	!>@param[in] coll_breakup_flag1, heyms_west, lawson, recycle
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
-    						coll_breakup_flag1, heyms_west)
+    						coll_breakup_flag1, heyms_west, lawson, recycle)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, inr,iqr, &
@@ -1626,7 +1644,8 @@
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
                     rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
-    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west
+    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west, &
+                        lawson, recycle
     integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1654,7 +1673,7 @@
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
     						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
-    						coll_breakup_flag1, heyms_west)
+    						coll_breakup_flag1, heyms_west,lawson, recycle)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
 		                cat_am,cat_c, cat_r, cat_i,nprec, &
@@ -1664,7 +1683,7 @@
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
     						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
-    						coll_breakup_flag1, heyms_west)
+    						coll_breakup_flag1, heyms_west,lawson, recycle)
     	n_step_o=max(n_step_o,n_step)
 #endif	
 	enddo
@@ -1711,13 +1730,14 @@
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, coll_breakup_flag1, heyms_west
+	!>@param[in] lawson, recycle
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
-    						coll_breakup_flag1, heyms_west)
+    						coll_breakup_flag1, heyms_west, lawson, recycle)
 #else
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -1755,6 +1775,7 @@
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, coll_breakup_flag1, heyms_west
+	!>@param[in] lawson, recycle
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
@@ -1762,7 +1783,7 @@
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
-    						coll_breakup_flag1, heyms_west)
+    						coll_breakup_flag1, heyms_west, lawson, recycle)
 #endif
 
 	use advection_1d
@@ -1781,7 +1802,8 @@
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
                                                     rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
-    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west
+    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west, &
+                            lawson, recycle
     integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1869,7 +1891,7 @@
 	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot
 	
-	real(sp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density
+	real(sp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density, qold1
 	real(sp) :: phi,vol, nfrag=0._sp, lam_freeze, n0_freeze
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1950,7 +1972,7 @@
     ! rain n0, lambda
     lam_r=(max(q(:,cst(cat_r)),1._sp)*cr*gam2r / &
             (max(q(:,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
-    n_r=rho(:)*max(q(:,cst(cat_r)),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
+    n_r=rho(:)*max(q(:,cst(cat_r)),1._sp)*lam_r**(1._sp+alpha_r) / gam1r
     ! cloud n0, lambda    
     lam_c=(max(q(:,inc),1._sp)*gam2c / (max(q(:,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
     n_c=rho(:)*max(q(:,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
@@ -1971,8 +1993,9 @@
     !                                         phi,rim,t(1:kp),rhoa)
 
             ! this calculates a, which is needed to implement the Magic Function.
-            a_hw = heymsfield_and_westbrook_fall_parameters1(1._sp/920._sp,1._sp,1._sp, &
-                                            1._sp,0._sp,t,rho)
+            ! assumes Ar=1
+            a_hw = heymsfield_and_westbrook_fall_parameters1(q(:,ini),q(:,iqi+2),&
+                q(:,iqi),1._sp, 1._sp,q(:,iqi+4),t,rho)
             a_hw1 = a_hw
             a_hw = 1._sp/(a_hw**(2._sp/di))
                                         
@@ -2069,6 +2092,7 @@
     	
     	cond=(q(k,iqc)-qold)
     	q(k,1)=q(k,1)-cond
+    	qold1(k)=qold
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     enddo
     
@@ -2110,7 +2134,7 @@
 #else
         k1=max(k-1,1)
 #endif
-	    if((q(k,iqc) .gt. qsmall) .and. (q(k1,iqc) .le. qsmall)) then
+	    if((q(k1,iqc) .lt. qsmall) .and. (q(k,iqc) .gt. qsmall).and.(u(k)>0._sp)) then
 	    
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Calculate the lognormal parameters                                         !
@@ -2363,7 +2387,8 @@
                     n0i=n_i(k)
 
                     if(heyms_west) then
-                        ci_new=pi/6._sp*910._sp
+                        ci_new=pi/6._sp*min(910._sp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_mode2_hw, &
@@ -2442,8 +2467,10 @@
                     lam_freeze=(q(k,  inc)/dummy1*gam2c/gam1c)
                     n0_freeze = q(k,  inc)/gam1c*lam_freeze**(alpha_c+1)
                     ! lawson et al
-!                     nfrag = 2.5e13_sp*n0_freeze/(cc**(4._sp/dc))* &
-!                         gam3c/(lam_freeze**(4._sp/dc+1._sp+alpha_c))
+                    if (lawson) then
+                        nfrag = 2.5e13_sp*n0_freeze/(cc**(4._sp/dc))* &
+                             gam3c/(lam_freeze**(4._sp/dc+1._sp+alpha_c))
+                    endif
                 endif
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 
@@ -2555,8 +2582,10 @@
                     lam_freeze=(q(k,  inr)/dummy1*gam2r/gam1r)**(1._sp/dr)
                     n0_freeze = q(k,  inr)/gam1r*lam_freeze**(alpha_r+1)
                     ! lawson et al
-!                     nfrag = 2.5e13_sp*n0_freeze* &
-!                         gam3r/(lam_freeze**(5._sp+alpha_r))
+                    if(lawson) then
+                        nfrag = 2.5e13_sp*n0_freeze* &
+                             gam3r/(lam_freeze**(5._sp+alpha_r))
+                    endif
                 endif
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -2747,6 +2776,7 @@
             rrsel(k)=sb_rsel
             rcwsel(k)=sb_cwsel
         endif
+        
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! end rain auto-conversion                                                       !		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2799,7 +2829,8 @@
                     n0i=n_i(k)
                     
                     if(heyms_west) then
-                        ci_new=pi/6._sp*910._sp
+                        ci_new=pi/6._sp*min(910._sp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_collisional_breakup_hw, &
@@ -2892,29 +2923,30 @@
             
             
             
-            
-                q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
+                if(recycle) &
+                    q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
                 do i=1,n_mode-1
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! add aerosol in sublimating ice water back to aerosol
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-                    ! this is number in aerosol, plus number in rain 
-                    !  (scaled by fraction in composition category)
-                    ! aer_in_rain * rain_num_evap / rain_num
-                    q(k,cst(cat_am)+(i-1)*3+1)      = &
-                        q(k,cst(cat_am)+(i-1)*3+1)   + &
-                        q(k,cst(cat_i)+(i-1)*3+6)
+                    if(recycle) then
+                        ! this is number in aerosol, plus number in rain 
+                        !  (scaled by fraction in composition category)
+                        ! aer_in_rain * rain_num_evap / rain_num
+                        q(k,cst(cat_am)+(i-1)*3+1)      = &
+                            q(k,cst(cat_am)+(i-1)*3+1)   + &
+                            q(k,cst(cat_i)+(i-1)*3+6)
                     
-                    ! this is surface area going into aerosol
-                    q(k,cst(cat_am)+(i-1)*3+2)    = &
-                        q(k,cst(cat_am)+(i-1)*3+2) +&
-                        q(k,cst(cat_i)+(i-1)*3+7) 
+                        ! this is surface area going into aerosol
+                        q(k,cst(cat_am)+(i-1)*3+2)    = &
+                            q(k,cst(cat_am)+(i-1)*3+2) +&
+                            q(k,cst(cat_i)+(i-1)*3+7) 
                         
-                    ! this is mass going into aerosol
-                    q(k,cst(cat_am)+(i-1)*3+3)    = &
-                        q(k,cst(cat_am)+(i-1)*3+3) +&
-                        q(k,cst(cat_i)+(i-1)*3+8) 
+                        ! this is mass going into aerosol
+                        q(k,cst(cat_am)+(i-1)*3+3)    = &
+                            q(k,cst(cat_am)+(i-1)*3+3) +&
+                            q(k,cst(cat_i)+(i-1)*3+8) 
+                    endif
                 
                     ! aerosol in ice
                     q(k,cst(cat_i)+(i-1)*3+6)=0._sp
@@ -2975,21 +3007,33 @@
         
         
     rho=1._sp ! fudge for advection conservation
-    do k=-o_halo+1,kp+o_halo
-        if(q(k,iqc) .lt. qsmall) then ! if evaporated
-            do i=1,n_mode-1
-                ! add aerosol in cloud water back to aerosol
-                q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_c)+(i-1)*3+2)
-                q(k,cst(i+1)+1)    =q(k,cst(i+1)+1) +q(k,cst(cat_c)+(i-1)*3+3)
-                q(k,cst(i+1)+2)    =q(k,cst(i+1)+2) +q(k,cst(cat_c)+(i-1)*3+4)
-                q(k,cst(cat_c)+(i-1)*3+2)=0._sp
-                q(k,cst(cat_c)+(i-1)*3+3)=0._sp
-                q(k,cst(cat_c)+(i-1)*3+4)=0._sp
-            enddo
-            q(k,inc) = 0.0_sp
-        endif
-    enddo
-
+    if(recycle) then
+        do k=-o_halo+1,kp+o_halo
+            if(q(k,iqc) .lt. qsmall) then ! if evaporated
+                do i=1,n_mode-1
+                    ! add aerosol in cloud water back to aerosol
+                    q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_c)+(i-1)*3+2)
+                    q(k,cst(i+1)+1)    =q(k,cst(i+1)+1) +q(k,cst(cat_c)+(i-1)*3+3)
+                    q(k,cst(i+1)+2)    =q(k,cst(i+1)+2) +q(k,cst(cat_c)+(i-1)*3+4)
+                    q(k,cst(cat_c)+(i-1)*3+2)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+3)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+4)=0._sp
+                enddo
+                q(k,inc) = 0.0_sp
+            endif
+        enddo
+    else
+        do k=-o_halo+1,kp+o_halo
+            if(q(k,iqc) .lt. qsmall) then ! if evaporated
+                do i=1,n_mode-1
+                    q(k,cst(cat_c)+(i-1)*3+2)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+3)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+4)=0._sp
+                enddo
+                q(k,inc) = 0.0_sp
+            endif
+        enddo    
+    endif
 
 
 
@@ -3027,32 +3071,34 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! add evaporated rain particles to mixed-mode aerosol
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
+            if(recycle) &
+                q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
 
             do i=1,n_mode-1
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! add aerosol in evaporating rain water back to aerosol
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-                ! this is number in aerosol, plus number in rain 
-                !  (scaled by fraction in composition category)
-                ! aer_in_rain * rain_num_evap / rain_num
-                q(k,cst(cat_am)+(i-1)*3+1)      = &
-                    q(k,cst(cat_am)+(i-1)*3+1)   + &
-                    q(k,cst(cat_r)+(i-1)*3+2) * &
-                    min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                if(recycle) then
+                    ! this is number in aerosol, plus number in rain 
+                    !  (scaled by fraction in composition category)
+                    ! aer_in_rain * rain_num_evap / rain_num
+                    q(k,cst(cat_am)+(i-1)*3+1)      = &
+                        q(k,cst(cat_am)+(i-1)*3+1)   + &
+                        q(k,cst(cat_r)+(i-1)*3+2) * &
+                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
                     
-                ! this is surface area going into aerosol
-                q(k,cst(cat_am)+(i-1)*3+2)    = &
-                    q(k,cst(cat_am)+(i-1)*3+2) +&
-                    q(k,cst(cat_r)+(i-1)*3+3) * &
-                    min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
-                ! this is mass going into aerosol
-                q(k,cst(cat_am)+(i-1)*3+3)    = &
-                    q(k,cst(cat_am)+(i-1)*3+3) +&
-                    q(k,cst(cat_r)+(i-1)*3+4) * &
-                    min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
-                
+                    ! this is surface area going into aerosol
+                    q(k,cst(cat_am)+(i-1)*3+2)    = &
+                        q(k,cst(cat_am)+(i-1)*3+2) +&
+                        q(k,cst(cat_r)+(i-1)*3+3) * &
+                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                    ! this is mass going into aerosol
+                    q(k,cst(cat_am)+(i-1)*3+3)    = &
+                        q(k,cst(cat_am)+(i-1)*3+3) +&
+                        q(k,cst(cat_r)+(i-1)*3+4) * &
+                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                endif                
                 ! aerosol in rain
                 q(k,cst(cat_r)+(i-1)*3+2)=q(k,cst(cat_r)+(i-1)*3+2)* &
                     (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp))
@@ -3109,26 +3155,26 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! add aerosol in melting ice water back to aerosol
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-                ! this is number in aerosol, plus number in ice 
-                !  (scaled by fraction in composition category)
-                ! aer_in_ice * ice_num_evap / ice_num
-                q(k,cst(cat_r)+(i-1)*3+2)      = &
-                    q(k,cst(cat_r)+(i-1)*3+2)   + &
-                    q(k,iai+(i-1)*3) * &
-                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                if(recycle) then
+                    ! this is number in aerosol, plus number in ice 
+                    !  (scaled by fraction in composition category)
+                    ! aer_in_ice * ice_num_evap / ice_num
+                    q(k,cst(cat_r)+(i-1)*3+2)      = &
+                        q(k,cst(cat_r)+(i-1)*3+2)   + &
+                        q(k,iai+(i-1)*3) * &
+                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
                     
-                ! this is surface area going into rain aerosol
-                q(k,cst(cat_r)+(i-1)*3+3)    = &
-                    q(k,cst(cat_r)+(i-1)*3+3) +&
-                    q(k,iai+(i-1)*3+1) * &
-                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
-                ! this is mass going into rain aerosol
-                q(k,cst(cat_r)+(i-1)*3+4)    = &
-                    q(k,cst(cat_r)+(i-1)*3+4) +&
-                    q(k,iai+(i-1)*3+2) * &
-                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
-                
+                    ! this is surface area going into rain aerosol
+                    q(k,cst(cat_r)+(i-1)*3+3)    = &
+                        q(k,cst(cat_r)+(i-1)*3+3) +&
+                        q(k,iai+(i-1)*3+1) * &
+                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                    ! this is mass going into rain aerosol
+                    q(k,cst(cat_r)+(i-1)*3+4)    = &
+                        q(k,cst(cat_r)+(i-1)*3+4) +&
+                        q(k,iai+(i-1)*3+2) * &
+                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                endif                
                 ! aerosol in ice
 !                 q(k,iai+(i-1)*3)=q(k,iai+(i-1)*3)* &
 !                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
@@ -3251,6 +3297,7 @@
 #endif	
 	endif
     ! rain 
+    vqr=0._sp
     if(sum(q(1:kp,cst(cat_r)+1)).gt.qsmall) then
         adv_l(2)=.true.
 		where(isnan(vqr))
@@ -3877,7 +3924,7 @@
         ! calculate the change in momentum - equation 7
         ! assume a coefficient of restitution of 0.5?
         ! units are g cm s-1
-        delm = 1.25_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*abs(vr-vi)*1.e5_sp 
+        delm = 0.25_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*abs(vr-vi)*1.e5_sp 
         nfrag = vard02(1)*(log(delm)**2)+vard02(2)*log(delm)+vard02(3)
         
         dintegral_collisional_breakup = dintegral_collisional_breakup * nfrag
@@ -3939,19 +3986,22 @@
 	!>Paul J. Connolly, The University of Manchester, 2021
 	!>@brief calculates the "constant term" in the reynolds number for Heymsfield and 
 	! Westbrook (2010)
-	!>@param[in] vol, mass, nmon, phi, rim, t, rhoa
+	!>@param[in] num,vol, mass, nmon, phi, rim, t, rhoa
 	!>@param[out] a
     elemental function &
-        heymsfield_and_westbrook_fall_parameters1(vol,mass,nmon,&
+        heymsfield_and_westbrook_fall_parameters1(num,vol,mass,nmon,&
                                         phi,rim,t,rhoa) result(a)
         use numerics_type, only : wp
         implicit none
-        real(wp), intent(in) :: vol, mass, nmon, phi, rim, t, rhoa
+        real(wp), intent(in) :: num,vol, mass, nmon, phi, rim, t, rhoa
         real(wp) :: a
         
         
-        a=0.0625_wp/sqrt(0.175_wp) / &
-            (viscosity_air(t))*2._wp*sqrt(rhoa*grav/(6._wp)*920._wp)
+!         a=0.0625_wp/sqrt(0.175_wp) / &
+!             (viscosity_air(t))*2._wp*sqrt(rhoa*grav/(6._wp)*(920._wp))
+        a=0.0625_wp/(sqrt(0.175_wp) *viscosity_air(t))* &
+            2._wp*sqrt(rhoa*grav*0.1667_wp * &
+                min((mass)/(vol+rim/920._wp),920._wp))
         
     
     end function heymsfield_and_westbrook_fall_parameters1
