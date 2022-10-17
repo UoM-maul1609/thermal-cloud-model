@@ -10,7 +10,7 @@ PAMM_DIR = pamm
 .PHONY: sfvt_code cleanall
 .PHONY: pamm_code cleanall
 CLEANDIRS = $(MPM_DIR) $(WMM_DIR) $(WMM_DIR)/bam $(SFVT_DIR) $(PAMM_DIR) $(PAMM_DIR)/sfvt \
-       $(PAMM_DIR)/bam ./
+       $(PAMM_DIR)/osnf $(PAMM_DIR)/bam ./
 
 
 DEBUG = -fbounds-check -g
