@@ -3,7 +3,7 @@
 	!>@brief
 	!>drivers and physics code for the thermal cloud model
     module drivers
-    use nrtype
+    use numerics_type
     use variables
     private
     public :: model_driver_2d
@@ -75,7 +75,7 @@
                                k,dsm_by_dz_z_eq_zc,b,del_gamma_mac, & 
                                del_c_s,del_c_t,epsilon_therm,w_peak,z_offset, therm_init)
 
-    use nrtype
+    use numerics_type
     use thermal
     use io_module
     use advection_2d
@@ -88,46 +88,46 @@
     integer(i4b), intent(in) :: nq,nprec,ncat, ip,kp, ord, o_halo, advection_scheme, &
                         inc, iqc, inr, iqr, ini, iqi, iai, &
                         n_mode, cat_am,cat_c, cat_r, cat_i
-    real(sp), intent(in) :: runtime, output_interval, dt, dx,dz, cvis
+    real(wp), intent(in) :: runtime, output_interval, dt, dx,dz, cvis
     integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
     character(len=20), dimension(nq) :: q_name
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q, &
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q, &
                                                                                     qold
-    real(sp), dimension(1:kp,1:ip,nprec), intent(inout) :: precip
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: z,zn, dz2
-    real(sp), dimension(-o_halo+1:ip+o_halo), intent(inout) :: x,xn, dx2
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
+    real(wp), dimension(1:kp,1:ip,nprec), intent(inout) :: precip
+    real(wp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: z,zn, dz2
+    real(wp), dimension(-o_halo+1:ip+o_halo), intent(inout) :: x,xn, dx2
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
                                     theta, th_old, p, t,rho,u,w
-    real(sp), dimension(1:kp,1:ip), intent(inout) :: delsq
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: vis
+    real(wp), dimension(1:kp,1:ip), intent(inout) :: delsq
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: vis
     logical, intent(inout) :: new_file, micro_init,therm_init
     logical, intent(in) :: monotone,ice_flag, hm_flag,wr_flag, rm_flag, &
                         theta_flag, viscous_dissipation
     integer(i4b), intent(in) :: microphysics_flag
-    real(sp), intent(in) :: mass_ice
+    real(wp), intent(in) :: mass_ice
     
     ! variables associated with thermals:
-    real(sp), intent(inout) :: k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
+    real(wp), intent(inout) :: k,dsm_by_dz_z_eq_zc,b,del_gamma_mac,del_c_s,del_c_t, &
     						epsilon_therm 
-    real(sp), intent(in) :: w_peak, z_offset
+    real(wp), intent(in) :: w_peak, z_offset
 
     ! local variables
     integer(i4b) :: nt, i, j, l,m,nsteps, iter
-    real(sp) :: time, time_last_output, output_time
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: rhoa,theta_ref
+    real(wp) :: time, time_last_output, output_time
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: rhoa,theta_ref
 
     
     ! fudge because dynamics is solenoidal for rhoa=const
-    rhoa=1._sp
-    theta_ref=0._sp
+    rhoa=1._wp
+    theta_ref=0._wp
     
     time_last_output=-output_interval
     output_time=output_interval
 
     
-    nt=ceiling(runtime / real(dt,kind=sp) )
+    nt=ceiling(runtime / real(dt,kind=wp) )
     do i=1,nt
-    	time=real(i-1,sp)*dt
+    	time=real(i-1,wp)*dt
         print *,'time-step ',i,' of ',nt, ' time=',time
 
 		
@@ -150,7 +150,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! advection                                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		nsteps=ceiling(dt/(0.7_sp*dz)*maxval(sqrt(u**2+w**2)))
+		nsteps=ceiling(dt/(0.7_wp*dz)*maxval(sqrt(u**2+w**2)))
 		select case (advection_scheme)
 			case (0) ! upstream
 				do iter=1,nsteps
@@ -158,7 +158,7 @@
 						! set halos
 						call set_halos_2d(ip,kp,o_halo,q(:,:,j))            
 						! advection
-						call first_order_upstream_2d(dt/real(nsteps,sp), &
+						call first_order_upstream_2d(dt/real(nsteps,wp), &
 								dx,dz,ip,kp,o_halo,u(:,:),w(:,:), &
 								q(:,:,j))
 					enddo
@@ -166,7 +166,7 @@
 						! set halos
 						call set_halos_2d(ip,kp,o_halo,theta)        
 						! advection
-						call first_order_upstream_2d(dt/real(nsteps,sp), &
+						call first_order_upstream_2d(dt/real(nsteps,wp), &
 								dx,dz,ip,kp,o_halo,u(:,:),w(:,:), &
 								theta(:,:))
 					endif
@@ -177,14 +177,14 @@
 						! set halos
 						call set_halos_2d(ip,kp,o_halo,q(:,:,j))            
 						! advection
-						call mpdata(4,ip,kp,o_halo,xn,zn,dx,dz,dt/real(nsteps,sp),u(:,:), &
+						call mpdata(4,ip,kp,o_halo,xn,zn,dx,dz,dt/real(nsteps,wp),u(:,:), &
 							 w(:,:),q(:,:,j),monotone)
 					enddo
 					if(theta_flag) then
 						! set halos
 						call set_halos_2d(ip,kp,o_halo,theta)        
 						! advection
-						call mpdata(4,ip,kp,o_halo,xn,zn,dx,dz,dt/real(nsteps,sp),u(:,:), &
+						call mpdata(4,ip,kp,o_halo,xn,zn,dx,dz,dt/real(nsteps,wp),u(:,:), &
 						     w(:,:),theta(:,:),monotone)
 					endif
 				enddo
@@ -195,7 +195,7 @@
 						! set halos
 						call set_halos_2d(ip,kp,o_halo,q(:,:,j))            
 						! advection
-						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
+						call mpdata_2d(dt/real(nsteps,wp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
 						    ip,kp,o_halo,o_halo,u,w,q(:,:,j),4,monotone,0)
 						
@@ -204,7 +204,7 @@
 						! set halos
 						call set_halos_2d(ip,kp,o_halo,theta)        
 						! advection
-						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
+						call mpdata_2d(dt/real(nsteps,wp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
 						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone,0)
 					endif
@@ -219,7 +219,7 @@
 
 					do j=1,ncat
 						! advection sfvt
-						call mpdata_vec_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
+						call mpdata_vec_2d(dt/real(nsteps,wp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
 						    ip,kp,c_e(j)-c_s(j)+1,o_halo,o_halo,u,w,&
 						    q(:,:,c_s(j):c_e(j)),4,monotone,0)
@@ -229,7 +229,7 @@
 						! set halos
 						call set_halos_2d(ip,kp,o_halo,theta)        
 						! advection
-						call mpdata_2d(dt/real(nsteps,sp),dx2,dz2,dx2,dz2,&
+						call mpdata_2d(dt/real(nsteps,wp),dx2,dz2,dx2,dz2,&
 						    rhoa(:,1),rhoa(:,1),&
 						    ip,kp,o_halo,o_halo,u,w,theta(:,:),4,monotone,0)
 					endif
@@ -259,17 +259,17 @@
                 ! set previous values (for dissipation)
                 qold=q
                 th_old=theta
-!                call dissipation(ip,kp,o_halo,dt,0.5_sp*(theta+th_old),delsq,dx,dz)
+!                call dissipation(ip,kp,o_halo,dt,0.5_wp*(theta+th_old),delsq,dx,dz)
                 call dissipation(ip,kp,o_halo,dt,theta,delsq,vis,dx,dz)
-                theta(1:kp,1:ip)=theta(1:kp,1:ip)+dt/5._sp*delsq
+                theta(1:kp,1:ip)=theta(1:kp,1:ip)+dt/5._wp*delsq
                 if(microphysics_flag.le.3) then
                     do j=1,nq
 						call set_halos_2d(ip,kp,o_halo,q(:,:,j))        
-!                         call dissipation(ip,kp,o_halo,dt,0.5_sp*(q(:,:,j)+qold(:,:,j)), &
+!                         call dissipation(ip,kp,o_halo,dt,0.5_wp*(q(:,:,j)+qold(:,:,j)), &
 !                             delsq,dx,dz)
                         call dissipation(ip,kp,o_halo,dt,q(:,:,j), &
                             delsq,vis,dx,dz)
-                        q(1:kp,1:ip,j)=q(1:kp,1:ip,j)+dt/5._sp*&
+                        q(1:kp,1:ip,j)=q(1:kp,1:ip,j)+dt/5._wp*&
                             delsq(1:kp,1:ip)
                     enddo
                 endif            
@@ -278,7 +278,7 @@
                     ! inhomogeneous mixing assumption:
                     q(1:kp,1:ip,inc)=&
                         min(max( qold(1:kp,1:ip,inc)* &
-                        (q(1:kp,1:ip,iqc)/qold(1:kp,1:ip,iqc)+1.e-15_sp),0._sp), &
+                        (q(1:kp,1:ip,iqc)/qold(1:kp,1:ip,iqc)+1.e-15_wp),0._wp), &
                          q(1:kp,1:ip,inc))
                     ! add the aerosol in cloud water to aerosol
                 endif
@@ -313,7 +313,7 @@
 							theta(:,:),p(:,:), &
 						   zn(:),theta_ref,&
 						   rho(:,:),rho(:,:),w(:,:),micro_init,hm_flag,mass_ice, &
-						   ice_flag, wr_flag, rm_flag,theta_flag,0.0_sp,1,0,0,0,.false., &
+						   ice_flag, wr_flag, rm_flag,theta_flag,0.0_wp,1,0,0,0,.false., &
 						   .false.,.true.)		
 						   
 		endif       
@@ -341,11 +341,11 @@
 	!>@param[inout] psi: field to set
     subroutine set_halos_2d(ip,kp,o_halo,psi)  
 
-    use nrtype
+    use numerics_type
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: ip, kp, o_halo
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: psi
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: psi
 
 	integer(i4b) :: i,k
 	do i=1,ip

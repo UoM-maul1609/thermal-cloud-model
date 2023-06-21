@@ -3,7 +3,7 @@
 	!>@brief
 	!>io routines
     module io_module
-    use nrtype
+    use numerics_type
     private
     public :: output_2d
     contains
@@ -22,19 +22,19 @@
     subroutine output_2d(time,nq,nprec,ip,kp,q_name, &
                         q,precip,theta,p,x,xn,z,zn,t,u,w,new_file)
 
-    use nrtype
+    use numerics_type
     use netcdf
     use variables, only : io1, outputfile
 
     implicit none
-    real(sp), intent(in) :: time
+    real(wp), intent(in) :: time
     integer(i4b), intent(in) :: nq,nprec,kp,ip
     character(len=20), dimension(nq) :: q_name
-    real(sp), dimension(kp,ip,nq), intent(in) :: q
-    real(sp), dimension(kp,ip,nprec), intent(in) :: precip
-    real(sp), dimension(kp,ip), intent(in) :: theta, p, t, u, w
-    real(sp), dimension(ip), intent(in) :: x,xn
-    real(sp), dimension(kp), intent(in) :: z,zn
+    real(wp), dimension(kp,ip,nq), intent(in) :: q
+    real(wp), dimension(kp,ip,nprec), intent(in) :: precip
+    real(wp), dimension(kp,ip), intent(in) :: theta, p, t, u, w
+    real(wp), dimension(ip), intent(in) :: x,xn
+    real(wp), dimension(kp), intent(in) :: z,zn
     logical, intent(inout) :: new_file
 
 
@@ -282,7 +282,7 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine check(status)
     use netcdf
-    use nrtype
+    use numerics_type
     integer(I4B), intent ( in) :: status
 
     if(status /= nf90_noerr) then
