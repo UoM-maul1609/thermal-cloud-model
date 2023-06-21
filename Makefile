@@ -1,3 +1,9 @@
+OSNF_DIR = osnf
+
+.PHONY: osnf_code cleanall
+CLEANDIRS = $(OSNF_DIR) ./
+
+
 DEBUG = -fbounds-check -g
 MPI    =#-DMPI1
 OPT    =-O3
@@ -11,42 +17,35 @@ RANLIB = ranlib
 OBJ = o
 FFLAGS = $(OPT) -w $(DEBUG)  -o 
 FFLAGS2 =  $(DEBUG) -w -O3 -o 
+VAR_TYPE = 1 # 0 single, 1 double
 
 
-micro_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
-				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ)
-	$(AR) rc micro_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
-				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ)
-locate.$(OBJ)	: locate.f90
-	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
-polint.$(OBJ)	: polint.f90
-	$(FOR) polint.f90 $(FFLAGS)polint.$(OBJ)
-nrtype.$(OBJ)	: nrtype.f90
-	$(FOR) nrtype.f90 $(FFLAGS)nrtype.$(OBJ)
-nr.$(OBJ)	: nr.f90 
-	$(FOR) nr.f90 $(FFLAGS)nr.$(OBJ)
-nrutil.$(OBJ)	: nrutil.f90
-	$(FOR) nrutil.f90 $(FFLAGS)nrutil.$(OBJ)
-rkqs.$(OBJ)	: rkqs.f90
-	$(FOR) rkqs.f90 $(FFLAGS)rkqs.$(OBJ)	
-rkck.$(OBJ)	: rkck.f90
-	$(FOR) rkck.f90 $(FFLAGS)rkck.$(OBJ)	
-dfridr.$(OBJ)	: dfridr.f90
-	$(FOR) dfridr.f90 $(FFLAGS)dfridr.$(OBJ)	
-odeint.$(OBJ)	: odeint.f90
-	$(FOR) odeint.f90 $(FFLAGS)odeint.$(OBJ)	
-zbrent.$(OBJ)	: zbrent.f90
-	$(FOR) zbrent.f90 $(FFLAGS2)zbrent.$(OBJ)	
-advection_1d.$(OBJ) : advection_1d.f90 
-	$(FOR) advection_1d.f90 $(FFLAGS)advection_1d.$(OBJ)
-microphysics.$(OBJ) : microphysics.f90 advection_1d.$(OBJ)
-	$(FOR) microphysics.f90 $(FFLAGS)microphysics.$(OBJ)
-hygfx.$(OBJ) : hygfx.for 
-	$(FOR) hygfx.for $(FFLAGS)hygfx.$(OBJ) 
+micro_lib.a	:   microphysics.$(OBJ) advection_1d.$(OBJ)
+	$(AR) rc micro_lib.a \
+				microphysics.$(OBJ) advection_1d.$(OBJ) \
+				$(OSNF_DIR)/numerics.$(OBJ) $(OSNF_DIR)/zeroin.$(OBJ) $(OSNF_DIR)/sfmin.$(OBJ) \
+                $(OSNF_DIR)/fmin.$(OBJ) $(OSNF_DIR)/r1mach.$(OBJ) \
+                $(OSNF_DIR)/d1mach.$(OBJ) $(OSNF_DIR)/dfsid1.$(OBJ) \
+                $(OSNF_DIR)/poly_int.$(OBJ) $(OSNF_DIR)/find_pos.$(OBJ) \
+                $(OSNF_DIR)/svode.$(OBJ) \
+                $(OSNF_DIR)/slinpk.$(OBJ) $(OSNF_DIR)/vode.$(OBJ) \
+                $(OSNF_DIR)/dlinpk.$(OBJ) $(OSNF_DIR)/vode_integrate.$(OBJ) \
+                $(OSNF_DIR)/erfinv.$(OBJ) $(OSNF_DIR)/tridiagonal.$(OBJ) \
+                $(OSNF_DIR)/hygfx.$(OBJ) $(OSNF_DIR)/random.$(OBJ)				
+advection_1d.$(OBJ) : advection_1d.f90 osnf_code
+	$(FOR) advection_1d.f90 $(FFLAGS)advection_1d.$(OBJ) -I$(OSNF_DIR)
+microphysics.$(OBJ) : microphysics.f90 advection_1d.$(OBJ) osnf_code
+	$(FOR) microphysics.f90 $(FFLAGS)microphysics.$(OBJ) -I$(OSNF_DIR)
 
-clean :
+osnf_code:
+	$(MAKE) -C $(OSNF_DIR)
+
+clean: 
 	rm *.exe  *.o *.mod *~ \
 	micro_lib.a
+
+cleanall:
+	for i in $(CLEANDIRS); do \
+		$(MAKE) -C $$i clean; \
+	done
 
