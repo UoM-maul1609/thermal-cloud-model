@@ -48,7 +48,6 @@ main.exe	:  model_lib.a  main.$(OBJ) variables.$(OBJ) initialisation.$(OBJ) \
 	$(FOR2) $(FFLAGS2)main.exe main.$(OBJ) variables.$(OBJ) initialisation.$(OBJ) \
 	     driver_code.$(OBJ) thermal_code.$(OBJ) io_code.$(OBJ) advection_2d.$(OBJ) \
 	     		 $(PAMM_DIR)/pmicro_lib.a $(MPM_DIR)/micro_lib.a $(WMM_DIR)/wmicro_lib.a \
-	     		  $(SFVT_DIR)/model_lib.a  \
 	     		 -lm model_lib.a -L$(PAMM_DIR) \
 		${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 model_lib.a	:   sfvt_code 
