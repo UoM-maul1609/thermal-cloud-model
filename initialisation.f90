@@ -196,7 +196,7 @@
 			z22=z(i-1)
 			p11=p(i,1)
 			htry=-dz
-			hmin=-1.e-2_wp
+			hmin=1.e-2_wp
 			! finds the pressure on different levels:
 			call vode_integrate(p11,z11,z22,eps2,htry,hmin,hydrostatic1a)
 			p(i-1,:)=p11(1) 
