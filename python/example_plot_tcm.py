@@ -14,16 +14,21 @@ from netCDF4 import Dataset
 nc = Dataset('/tmp/output3.nc')
 
 # extract needed variables
+iivar=23
 x = nc['x'][:]
 z = nc['z'][:]
-q = nc['q'][0,:,:,15]
+q =  nc['q'][:,:,:,iivar]
+qmin=np.min(q)
+qmax=np.max(q)
+q = nc['q'][0,:,:,iivar]
+# q = nc['w'][0,:,:]
 time=nc['time'][:]
 
 
 # plot out
 # fig=plt.figure(figsize=[10,2.5])
 fig, ax = plt.subplots()
-ax=plt.pcolormesh(x,z,q.transpose(),shading='gouraud')
+ax=plt.pcolormesh(x,z,q[:-1,:-1].transpose(),vmin=qmin,vmax=qmax,shading='flat')
 plt.title('time: ' + str(time[0]) + 's')
 plt.xlabel('x (m)')
 plt.ylabel('z (m)')
@@ -35,11 +40,13 @@ plt.gca().set_aspect('equal')
 plt.gca().autoscale(tight=True)
 
 def update(i):
-    q = np.copy(nc['q'][i*10,:,:,15])
-    ax.set_array(q.transpose().ravel())
+    q = nc['q'][i*10,:,:,iivar]
+    q = q[:-1, :-1]
+#     q = np.copy(nc['w'][i*10,:,:])
+    ax.set_array(q.transpose().flatten())
     ax.axes.set_title('time: ' + str(np.copy(time[i*10])) + 's')
 
-ani = animation.FuncAnimation(fig, update, frames=int(len(time)/10))
+ani = animation.FuncAnimation(fig, update, frames=int(len(time)/10),blit=False,repeat=False)
 
 
 ani.save('/tmp/plot_tcm.gif')
