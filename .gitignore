@@ -9,3 +9,5 @@ matlab/radial_function.m
 references
 namelist.andreas
 *.dSYM
+.DS_Store
+
