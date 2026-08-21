@@ -14,7 +14,7 @@ from netCDF4 import Dataset
 nc = Dataset('/tmp/output3.nc')
 
 # extract needed variables
-iivar=23
+iivar=14 #23
 x = nc['x'][:]
 z = nc['z'][:]
 q =  nc['q'][:,:,:,iivar]

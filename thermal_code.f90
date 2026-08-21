@@ -122,9 +122,12 @@
 	integer(i4b) :: i,j
 	real(wp) :: test3
 	complex(wp) :: test1,test2 
+	real(wp) :: xcentre,lx
 
     ! calculate the thermal properties
 	if(therm_init) then
+		lx = real(ip,wp)*dx
+		k = 2._wp*pi/lx
 		zc=zn(1)-z_offset !0._wp !500._wp
 		alpha1=1._wp/ttr
 		!k=2.e-3_wp                      ! changes the width
@@ -149,6 +152,8 @@
 	endif
 
 	wcen=0._wp	
+	xcentre = xn((ip+1)/2)
+	
 	! order of nested do loop is 2nd dimension first
 	do i=0,ip
 		do j=-1,kp
@@ -167,14 +172,15 @@
 				test1=small1+2._wp*test3*(z_bar+test3/2._wp- &
 							 k1/3._wp*test3**2._wp)
 				test1=-n_bar_mac/k*(z_bar+test3-k1*test3**2)/sqrt(test1) &
-						*sin(k*xn(i+1))
+						*sin(k*xn(i+1)-xcentre)
 									
 				zc=zn(1) !-z_offset
 				test3=((zn(j+1)-z_offset)-zc)
+				
 				test2=small1+2._wp*test3*(z_bar+test3/2._wp- &
 							 k1/3._wp*test3**2._wp)
 
-				test2=n_bar_mac* sqrt(test2) *cos(k*x(i))
+				test2 = n_bar_mac*sqrt(test2)*cos(k*(xn(i)))
 
 				u(j,i)=real(test1)!+imag(test1)
 ! 				if(j.eq.122) u(j,i)=u(j,i)-imag(test1)
@@ -187,7 +193,7 @@
 				test3=((z(j+1)-z_offset)-zc)
 				test2=small1+2._wp*test3*(z_bar+test3/2._wp- &
 							 k1/3._wp*test3**2._wp)
-				test2=n_bar_mac* sqrt(test2) *cos(k*(xn(i)))
+				test2=n_bar_mac* sqrt(test2) *cos(k*(x(i)))
 				wcen(j,i)=real(test2)
 				
 				
@@ -207,13 +213,24 @@
 	w=0._wp
 	! centred differences:
 	u(1:kp,0)=(wcen(1:kp,1)-wcen(0:kp-1,1))*dx/dz
+	u(1:kp,0) = 0._wp
 	do i=1,ip
-		u(1:kp,i)=u(1:kp,i-1)-(wcen(1:kp,i)-wcen(0:kp-1,i))*dx/dz
+		u(1:kp,i)=u(1:kp,i-1) - &
+			(wcen(1:kp,i)-wcen(0:kp-1,i))*dx/dz
 	enddo
 	w(1:kp,1:ip)=(wcen(1:kp,1:ip))
-    u(1,:)=0._wp
-    w(1,:)=0._wp
-	! halos
+
+	u(1,:)=0._wp
+	w(1,:)=0._wp
+	
+	! Remove horizontally uniform component of u.
+	! This chooses the symmetric/zero-mean integration constant.
+! 	do j=2,kp
+! 		u(j,1:ip) = u(j,1:ip) - &
+! 					 sum(u(j,1:ip))/real(ip,wp)
+! 	enddo
+	
+	! NOW set the periodic halos
 	u(1:kp,-o_halo+1:0)=u(1:kp,ip-o_halo+1:ip)
  	u(1:kp,ip+1:ip+o_halo)=u(1:kp,1:o_halo)
 	w(1:kp,-o_halo+1:0)=w(1:kp,ip-o_halo+1:ip)
@@ -236,7 +253,13 @@
 	w(-o_halo+1:0,-o_halo+1:ip+o_halo)=0._wp
 	u(-o_halo+1:0,-o_halo+1:ip+o_halo)=0._wp
 	
-
+! 	print *, 'w symmetry error = ', &
+! 		maxval(abs(w(1:kp,1:ip) - w(1:kp,ip:1:-1)))
+! 	print *, 'u seam = ', maxval(abs(u(1:kp,ip)))
+! 	
+! 	print *, 'u antisym error = ', &
+! 		maxval(abs(u(1:kp,1:ip-1) + u(1:kp,ip-1:1:-1)))
+    
     end subroutine thermal_2d
 
 	!>@author

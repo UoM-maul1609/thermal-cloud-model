@@ -170,8 +170,10 @@
     zn=z-0.5_wp*dz
     ! set up horizontal level array
     x=dx*(/(i,i=-o_halo,ip+o_halo-1)/)!-0.5_wp*dx
-    x=x-0.5_wp*dx
-    xn=x-0.5_wp*dx
+	do i=lbound(x,1),ubound(x,1)
+		x(i)  = (real(i,wp)-0.5_wp)*dx
+		xn(i) = (real(i,wp)-1._wp)*dx
+	enddo
     dx2=dx
     dz2=dz
     

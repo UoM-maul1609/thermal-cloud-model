@@ -349,18 +349,17 @@
 
 	integer(i4b) :: i,k
 	do i=1,ip
-		! top
+		! top/bottom for physical columns
 		psi(kp+1:kp+o_halo,i)=psi(kp,i)
-		! bottom
 		psi(-o_halo+1:0,i)=psi(1,i)
 	enddo
-		
-	do k=1,kp
-		! left
+	
+	! Periodic x boundaries INCLUDING the top/bottom halo rows.
+	! This also fills all four corner halo regions.
+	do k=-o_halo+1,kp+o_halo
 		psi(k,-o_halo+1:0)=psi(k,ip-o_halo+1:ip)
-		! right
 		psi(k,ip+1:ip+o_halo)=psi(k,1:o_halo)
-	enddo 
+	enddo
 		
 	end subroutine set_halos_2d
 
