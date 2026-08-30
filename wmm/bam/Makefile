@@ -1,0 +1,49 @@
+OSNF_DIR = osnf
+OSNF_LIB = $(OSNF_DIR)/osnf_lib.a
+
+.PHONY: all clean cleanall debug
+
+DEBUG = -fbounds-check -g
+OPT   = -O3
+
+FOR  = gfortran -c
+FOR2 = gfortran
+AR   = ar
+OBJ  = o
+
+FFLAGS  = $(OPT) $(DEBUG) -o
+FFLAGS2 = $(DEBUG) $(OPT) -o
+
+all: main.exe
+
+main.exe: bam_lib.a main.$(OBJ)
+	$(FOR2) $(FFLAGS2)main.exe main.$(OBJ) -lm bam_lib.a $(DEBUG)
+
+bam_lib.a: bulk_activation_module.$(OBJ) $(OSNF_LIB)
+	$(AR) rc bam_lib.a bulk_activation_module.$(OBJ) \
+		$(OSNF_DIR)/numerics.$(OBJ) $(OSNF_DIR)/zeroin.$(OBJ) $(OSNF_DIR)/sfmin.$(OBJ) \
+		$(OSNF_DIR)/fmin.$(OBJ) $(OSNF_DIR)/r1mach.$(OBJ) $(OSNF_DIR)/d1mach.$(OBJ) \
+		$(OSNF_DIR)/dfsid1.$(OBJ) $(OSNF_DIR)/poly_int.$(OBJ) $(OSNF_DIR)/find_pos.$(OBJ) \
+		$(OSNF_DIR)/svode.$(OBJ) $(OSNF_DIR)/slinpk.$(OBJ) $(OSNF_DIR)/vode.$(OBJ) \
+		$(OSNF_DIR)/dlinpk.$(OBJ) $(OSNF_DIR)/vode_integrate.$(OBJ) \
+		$(OSNF_DIR)/erfinv.$(OBJ) $(OSNF_DIR)/tridiagonal.$(OBJ) \
+		$(OSNF_DIR)/hygfx.$(OBJ) $(OSNF_DIR)/random.$(OBJ)
+
+main.$(OBJ): main.f90 bulk_activation_module.$(OBJ)
+	$(FOR) main.f90 $(FFLAGS)main.$(OBJ) -I$(OSNF_DIR)
+
+bulk_activation_module.$(OBJ): bulk_activation_module.f90 $(OSNF_LIB)
+	$(FOR) bulk_activation_module.f90 $(FFLAGS)bulk_activation_module.$(OBJ) -I$(OSNF_DIR)
+
+$(OSNF_LIB):
+	$(MAKE) -C $(OSNF_DIR) osnf_lib.a OPT="$(OPT)" DEBUG="$(DEBUG)"
+
+debug:
+	$(MAKE) cleanall
+	$(MAKE) OPT="-O0" DEBUG="-g -fcheck=all -ffpe-trap=invalid,zero,overflow -fbacktrace -Wall -Wextra"
+
+clean:
+	rm -f *.exe *.o *.mod *~ bam_lib.a
+
+cleanall: clean
+	$(MAKE) -C $(OSNF_DIR) clean
