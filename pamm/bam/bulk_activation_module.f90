@@ -36,12 +36,17 @@
 											  delta_h_vap1
 											  
 		real(wp), dimension(6) :: c1	! private
-		logical(lgt) :: check			! private
 		integer(i4b) :: n_mode_s		! private
 		real(wp) :: p_test, t_test, w_test, a_eq_7, b_eq_7 ! public
+		real(wp) :: ghosh_sigma_acc=1.6_wp, ghosh_dmin=80.e-9_wp, &
+		            ghosh_dmax=1.e-6_wp, ghosh_sigma_used=1.6_wp
 		
-		integer(i4b) :: n_mode, n_sv, method_flag, giant_flag, sv_flag 
-		! 1=abdul-razzak, ghan; 2=fountoukis and nenes; 3=fountoukis and nenes with quad
+		integer(i4b) :: n_mode, n_sv, method_flag, giant_flag, sv_flag
+		integer(i4b) :: ghosh_sigma_mode=0
+		! method_flag: 1=Abdul-Razzak and Ghan; 2=Fountoukis and Nenes;
+		! 3=Fountoukis and Nenes with quadrature; 4=Ghosh-modified ARG.
+		! ghosh_sigma_mode: 0=fixed ghosh_sigma_acc (published-style);
+		! 1=effective width diagnosed from the combined PSD (experimental).
 	
 		! for random number:
 		real(wp) :: r, mean_w, sigma_w
@@ -54,7 +59,9 @@
 	public :: ctmm_activation, allocate_arrays, initialise_arrays, &
 		read_in_bam_namelist, find_d_and_s_crits, &
 		n_mode, n_sv, method_flag, giant_flag, sv_flag, &
-		p_test, t_test, w_test, a_eq_7, b_eq_7, n_aer1, d_aer1, sig_aer1, &
+		p_test, t_test, w_test, a_eq_7, b_eq_7, &
+		ghosh_sigma_mode, ghosh_sigma_acc, ghosh_dmin, ghosh_dmax, ghosh_sigma_used, &
+		n_aer1, d_aer1, sig_aer1, &
 		org_content1, molw_org1, log_c_star1, density_org1, nu_org1, delta_h_vap1, &
 		molw_core1, density_core1, nu_core1, act_frac1, &
 		r, mean_w, sigma_w, rs, seed, l, n_rand, rand_dist, &
@@ -69,7 +76,7 @@
 	!>root-find to solve for smax and dcrit needed so that drop number is achieved
 	!>parameterisation developed at university of manchester
 	!>@param[in] p,t
-	!>@param[inout] ndrop drop number concentration
+	!>@param[inout] ndrop drop number mixing ratio (kg-1 dry air)
 	!>@param[inout] scrit, dscrit
 	subroutine find_d_and_s_crits(p,t,ndrop,w,smax,dcrit)
 	    use numerics_type
@@ -144,7 +151,8 @@
 	!>@param[in] n_modes1, n_sv1 : number of aerosol and volatility modes
 	!>@param[in] sv_flag: flag for cocondensation
 	!>@param[inout] n_aer, d_aer, sig_aer, molw_core, density_core, nu_core
-	!>@param[in] org_content1: amount of organic in volatility bins
+	!> n_aer1 is number mixing ratio (kg-1 dry air); n_aer is converted internally to m-3
+	!>@param[in] org_content1: amount of organic in volatility bins (microgram kg-1 air)
 	!>@param[in] molw_org1: molecular weight in volatility bins
 	!>@param[in] density_org1: density of organic in volatility bins
 	!>@param[in] delta_h_vap1: enthalpy change in volatility bins
@@ -155,227 +163,279 @@
 	!>@param[inout] smax1: maximum supersaturation
 	!>@param[inout] dcrit1: critical diameters in each mode
 	subroutine ctmm_activation(n_modes1,n_sv1,sv_flag, n_aer1,d_aer1,sig_aer1,molw_core1, &
-							   density_core1, nu_core1, org_content1, &
-							   molw_org1, density_org1, delta_h_vap1, nu_org1,  &
+                               density_core1, nu_core1, org_content1, &
+                               molw_org1, density_org1, delta_h_vap1, nu_org1,  &
                                log_c_star1, &
                                w1, t1,p1,a_arg,b_arg, &
-							   act_frac1,smax1,dcrit1)
+                               act_frac1,smax1,dcrit1)
 
-	    use numerics_type
-		use numerics, only : zeroin, fmin
-		implicit none 
-		      real(wp), dimension(:), intent(in) :: n_aer1
-			  real(wp), dimension(:), intent(inout) :: d_aer1, sig_aer1, molw_core1, &
-													density_core1, nu_core1
-			  real(wp), dimension(:), intent(in) :: org_content1  , molw_org1, &
-			  							density_org1, delta_h_vap1, nu_org1, log_c_star1                               
-			  real(wp), intent(in) :: w1,t1,p1, a_arg, b_arg
-			  integer, intent(in) :: n_modes1, n_sv1, sv_flag
-			  real(wp), dimension(:), intent(inout) :: act_frac1, dcrit1
-			  real(wp), intent(inout) :: smax1
+        use numerics_type
+        use numerics, only : zeroin, fmin
+        implicit none
+        real(wp), dimension(:), intent(in) :: n_aer1
+        real(wp), dimension(:), intent(inout) :: d_aer1, sig_aer1, molw_core1, &
+                                                density_core1, nu_core1
+        real(wp), dimension(:), intent(in) :: org_content1, molw_org1, &
+                                               density_org1, delta_h_vap1, nu_org1, log_c_star1
+        real(wp), intent(in) :: w1,t1,p1, a_arg, b_arg
+        integer, intent(in) :: n_modes1, n_sv1, sv_flag
+        real(wp), dimension(:), intent(inout) :: act_frac1, dcrit1
+        real(wp), intent(inout) :: smax1
 
-		integer(i4b):: i
-		
-		n_mode_s=n_modes1
-		n_aer=n_aer1
-		d_aer=d_aer1
-		sig_aer=sig_aer1
-		molw_core=molw_core1
-		density_core=density_core1
-		nu_core=nu_core1
-		
+        integer(i4b) :: i
+        real(wp) :: n_total, sum_term, org_mass_total, org_volume_total, &
+                    org_ion_total, mode_weight, solute_moles_per_mass, &
+                    ghosh_f, ghosh_g, ghosh_p, p_exp(n_modes1)
+        logical :: active(n_modes1)
 
-		org_content=org_content1*1e-9_wp/(p1/r_air/t1) ! kg/kg
-		molw_org=molw_org1
-		density_org=density_org1
-		delta_h_vap=delta_h_vap1
-		nu_org=nu_org1
-		log_c_star=log_c_star1
+        if (n_modes1 <= 0) error stop 'BAM: n_modes must be positive'
+        if (n_sv1 <= 0) error stop 'BAM: n_sv must be positive'
+        if (size(n_aer1) < n_modes1 .or. size(d_aer1) < n_modes1 .or. &
+            size(sig_aer1) < n_modes1) error stop 'BAM: aerosol array too small'
+        if (any(n_aer1(1:n_modes1) < 0._wp)) error stop 'BAM: n_aer1 must be >= 0 kg-1'
+        if (any(d_aer1(1:n_modes1) <= 0._wp)) error stop 'BAM: d_aer1 must be > 0 m'
+        if (any(sig_aer1(1:n_modes1) <= 0._wp)) error stop 'BAM: sig_aer1=ln(sigma_g) must be > 0'
+        if (any(molw_core1(1:n_modes1) <= 0._wp)) error stop 'BAM: molw_core1 must be > 0'
+        if (any(density_core1(1:n_modes1) <= 0._wp)) error stop 'BAM: density_core1 must be > 0'
+        if (any(nu_core1(1:n_modes1) <= 0._wp)) error stop 'BAM: nu_core1 must be > 0'
+        if (method_flag < 1 .or. method_flag > 4) error stop 'BAM: method_flag must be 1, 2, 3 or 4'
+        if (sv_flag < 0 .or. sv_flag > 1) error stop 'BAM: sv_flag must be 0 or 1'
 
-		
-		if(sv_flag.eq.1) then
+        ! Make this routine self-contained.  The public aerosol number interface is
+        ! kg-1 dry air, but the published ARG/FN supersaturation balances require
+        ! number per unit volume. initialise_arrays performs that internal conversion
+        ! and constructs mass_initial in kg m-3.
+        call initialise_arrays(n_modes1,n_sv1,p1,t1,w1,n_aer1, &
+                               d_aer1,sig_aer1,molw_org1,density_core1)
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! Find how much semi-volatile is condensed
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			call solve_semivolatiles(n_modes1,n_sv1, &
-					org_content, log_c_star, delta_h_vap, nu_org, molw_org, &
-					mass_initial, nu_core, molw_core,rhinit, t1, &
-					mass_org_condensed)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        n_mode_s=n_modes1
+        molw_core=molw_core1
+        density_core=density_core1
+        nu_core=nu_core1
 
+        org_content=0._wp
+        molw_org=molw_org1
+        density_org=density_org1
+        delta_h_vap=delta_h_vap1
+        nu_org=nu_org1
+        log_c_star=log_c_star1
+        mass_org_condensed=0._wp
 
+        active = n_aer(1:n_modes1) > 0._wp
+        n_total=sum(n_aer(1:n_modes1),mask=active)
+        act_frac1=0._wp
+        act_frac2=0._wp
+        dcrit2=huge(1._wp)
+        dcrit1(1:n_modes1)=huge(1._wp)
+        smax=0._wp
+        smax1=0._wp
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! distribute mass in proportion to number - this is wrong - Crooks has a 
-			! better method
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			mass_final=mass_initial+sum(mass_org_condensed)* &
-									n_aer/sum(n_aer(1:n_modes1)) 
-									! final mass after co-condensation
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! No ascent means no new cloud-base activation.  This also avoids the
+        ! singular w=0 limits in both activation parameterisations.
+        if (w1 <= 0._wp .or. n_total <= 0._wp) return
 
+        if(sv_flag.eq.1) then
+            if (any(org_content1(1:n_sv1) < 0._wp)) error stop 'BAM: org_content1 must be >= 0 ug kg-1'
+            if (any(molw_org1(1:n_sv1) <= 0._wp)) error stop 'BAM: molw_org1 must be > 0'
+            if (any(density_org1(1:n_sv1) <= 0._wp)) error stop 'BAM: density_org1 must be > 0'
+            if (any(nu_org1(1:n_sv1) <= 0._wp)) error stop 'BAM: nu_org1 must be > 0'
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! calculate the new density - this is wrong - Crooks has a 
-			! better method
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			density_final=mass_initial/density_core+sum(mass_org_condensed/density_org) * &
-													n_aer/sum(n_aer(1:n_modes1))
-			density_final=mass_final/density_final
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! External organic mass is microgram per kg dry air.  The equilibrium
+            ! partitioning calculation is volumetric, so convert to kg m-3 using
+            ! the same dry-air density used for n_aer.
+            org_content=org_content1*1.e-9_wp*dry_air_density(t1,p1,rhinit)
 
+            call solve_semivolatiles(n_modes1,n_sv1, &
+                    org_content, log_c_star, delta_h_vap, nu_org, molw_org, &
+                    mass_initial, nu_core, molw_core,rhinit, t1, &
+                    mass_org_condensed)
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! calculate the arithmetic standard deviations                               !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			sd=exp(log(d_aer)+0.5_wp*sig_aer)*sqrt(exp(sig_aer**2)-1._wp)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Retain the original Connolly-style multi-mode approximation: total
+            ! condensed organic mass is distributed in proportion to particle
+            ! number.  This is not the full Crooks multi-mode treatment.
+            org_mass_total=sum(mass_org_condensed)
+            org_volume_total=sum(mass_org_condensed/density_org)
+            do i=1,n_modes1
+                if (.not.active(i)) then
+                    mass_final(i)=0._wp
+                    density_final(i)=density_core(i)
+                    cycle
+                endif
+                mode_weight=n_aer(i)/n_total
+                mass_final(i)=mass_initial(i)+org_mass_total*mode_weight
+                density_final(i)=mass_initial(i)/density_core(i)+org_volume_total*mode_weight
+                if (density_final(i) <= 0._wp) error stop 'BAM: non-positive mixed aerosol volume'
+                density_final(i)=mass_final(i)/density_final(i)
+            enddo
 
+            ! Arithmetic standard deviation of a lognormal distribution. sig_aer
+            ! is ln(sigma_g), hence the 0.5*sig_aer**2 term.
+            sd=0._wp
+            do i=1,n_modes1
+                if (active(i)) sd(i)=exp(log(d_aer(i))+0.5_wp*sig_aer(i)**2)* &
+                                      sqrt(exp(sig_aer(i)**2)-1._wp)
+            enddo
 
+            ! Shift each active mode while conserving its final mass and keeping
+            ! its arithmetic standard deviation fixed (Connolly et al., 2014).
+            d_aer_new=d_aer
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                density_dummy=density_final(i)
+                mass_dummy=mass_final(i)
+                n_dummy=n_aer(i)
+                sd_dummy=sd(i)
+                d_aer_new(i)=fmin(d_aer(i),2000.e-9_wp,mass_integrate,1.e-30_wp)
+                xmin=mass_integrate(d_aer_new(i))
+            enddo
 
+            d_aer=d_aer_new
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                d_dummy=d_aer_new(i)
+                sd_dummy=sd(i)
+                sig_aer(i)=zeroin(1.e-9_wp,2._wp,find_sig_aer,1.e-6_wp)
+            enddo
+        else
+            mass_org_condensed=0._wp
+            mass_final=mass_initial
+            density_final=density_core
+        endif
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! note that for multiple modes, assume sd remains constant for all modes and 
-			! shift each mode by the same amount in diameter space, such that the total 
-			! mass constraint is satisfied. (see Connolly et al, 2014 acp))
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Mixed-solute Kohler B.  For sv_flag=0 this reduces exactly to
+        ! B = nu * M_w * rho_a / (M_a * rho_w).  For sv_flag=1 the core and
+        ! condensed-organic solute mole contributions are summed explicitly.
+        org_ion_total=0._wp
+        if (sv_flag.eq.1) org_ion_total=sum(mass_org_condensed*nu_org/molw_org)
+        b=1._wp
+        do i=1,n_modes1
+            if (.not.active(i)) cycle
+            if (mass_final(i) <= 0._wp) error stop 'BAM: non-positive final aerosol mass'
+            mode_weight=n_aer(i)/n_total
+            solute_moles_per_mass=(mass_initial(i)*nu_core(i)/molw_core(i) + &
+                                   org_ion_total*mode_weight)/mass_final(i)
+            b(i)=molw_vap*density_final(i)/rhow*solute_moles_per_mass
+            if (b(i) <= 0._wp) error stop 'BAM: non-positive Kohler B parameter'
+        enddo
 
+        if(method_flag.eq.1 .or. method_flag.eq.4) then
+            a=2._wp*sigma*molw_vap/(rhow*r_gas*tcb)
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! now calculate the new median diameter                                      !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			do i=1,n_modes1
-				density_dummy=density_final(i)
-				mass_dummy=mass_final(i)
-				n_dummy=n_aer(i)
-				sd_dummy=sd(i)
-				d_aer_new(i)=fmin(d_aer(i),2000.e-9_wp, mass_integrate,1.e-30_wp)
-				xmin = mass_integrate(d_aer_new(i))
-			enddo
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            sm=huge(1._wp)
+            eta=huge(1._wp)
+            f1=0._wp
+            f2=0._wp
+            p_exp=1.5_wp
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                sm(i)=2._wp/sqrt(b(i))*(a/(3._wp*d_aer(i)/2._wp))**1.5_wp
+            enddo
 
+            alpha_sup=grav*molw_vap*lv/(cp*r_gas*tcb**2)- &
+                      grav*molw_air/(r_gas*tcb)
+            sigma_sup=r_gas*tcb/(svp(tcb)*molw_vap)+ &
+                      molw_vap*lv**2/(cp*pcb*molw_air*tcb)
+            g=rhow*r_gas*tcb/(svp(tcb)*dd(tcb,pcb)*molw_vap) + &
+              lv*rhow/(ka(tcb)*tcb)*(lv*molw_vap/(r_gas*tcb)-1._wp)
+            g=1._wp/g
 
+            chi=(2._wp/3._wp)*(alpha_sup*w/g)**0.5_wp*a
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                eta(i)=(alpha_sup*w/g)**1.5_wp/ &
+                       (2._wp*pi*rhow*sigma_sup*n_aer(i))
+            enddo
 
+            if (method_flag.eq.1) then
+                ! Original ARG2000 form.  BAM retains a_arg and b_arg as
+                ! configurable coefficients in the fitted f_i function.
+                do i=1,n_modes1
+                    if (.not.active(i)) cycle
+                    f1(i)=a_arg*exp(b_arg*sig_aer(i)**2)
+                    f2(i)=1._wp+0.25_wp*sig_aer(i)
+                enddo
+            else
+                ! Ghosh et al. (2025) modified ARG.  The same f, g and
+                ! kinetically-limited p are used for every aerosol mode and
+                ! depend only on one accumulation-mode reference width.
+                select case (ghosh_sigma_mode)
+                case (0)
+                    ghosh_sigma_used=ghosh_sigma_acc
+                    if (ghosh_sigma_used < 1.4_wp .or. ghosh_sigma_used > 2.1_wp) &
+                        error stop 'BAM: fixed ghosh_sigma_acc must be in calibrated range 1.4 to 2.1'
+                case (1)
+                    ghosh_sigma_used=effective_accum_sigma(n_modes1,n_aer,d_aer,sig_aer, &
+                                                          ghosh_dmin,ghosh_dmax)
+                case default
+                    error stop 'BAM: ghosh_sigma_mode must be 0 (fixed) or 1 (effective)'
+                end select
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! now calculate the new geometric standard deviation                         !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			d_aer=d_aer_new
-			do i=1,n_modes1
-				d_dummy=d_aer_new(i)
-				sd_dummy=sd(i)
-				sig_aer(i)=zeroin(1e-9_wp,2e0_wp, find_sig_aer,1.e-6_wp)
-			enddo
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		else if(sv_flag.eq.0) then
-			mass_org_condensed=0._wp
-			mass_final=mass_initial
-			density_final=density_core
-		endif
+                if (ghosh_sigma_mode.eq.1 .and. &
+                    (ghosh_sigma_used < 1.4_wp .or. ghosh_sigma_used > 2.1_wp)) then
+                    write(*,'(a,f10.5,a)') 'BAM warning: diagnosed Ghosh sigma_g=', &
+                        ghosh_sigma_used,' is outside published calibration range 1.4-2.1'
+                endif
 
-		
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! now calculate the activated fraction                                           !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(method_flag.eq.1) then
-			a=2._wp*sigma*molw_vap/(rhow*r_gas*tcb)             ! eq 5: abdul-razzak, ghan
-			! above, 2 should be 4 for fountoukis and nenes
-  
-			b=density_final/ &
-			  ( (molw_core*mass_initial/nu_core+ & 
-			  sum(molw_org*mass_org_condensed/nu_org)* &
-			    mass_initial/sum(mass_initial(1:n_modes1))) / &
-			  mass_final)/(rhow/molw_vap)                       ! eq 6: abdul-razzak, ghan
-			sm=2._wp/sqrt(b)*(a/(3._wp*d_aer/2._wp))**1.5_wp    ! eq 8: abdul-razzak, ghan 
-																! or 9: of 2000 paper
+                ghosh_f=0.0135_wp*exp(2.367_wp*ghosh_sigma_used)
+                ghosh_g=1.1058_wp-0.315_wp*ghosh_sigma_used
+                ghosh_p=-0.5073_wp+1.5088_wp*ghosh_sigma_used- &
+                        0.3699_wp*ghosh_sigma_used**2
 
-			alpha_sup=grav*molw_vap*lv/(cp*r_gas*tcb**2)- &
-					  grav*molw_air/(r_gas*tcb)                ! eq 11: abdul-razzak, ghan
+                if (ghosh_f <= 0._wp .or. ghosh_g <= 0._wp .or. ghosh_p <= 0._wp) &
+                    error stop 'BAM: non-positive Ghosh f, g or p; check effective/fixed sigma'
 
-			sigma_sup=r_gas*tcb/(svp(tcb)*molw_vap)+ &
-					  molw_vap*lv**2/(cp*pcb*molw_air*tcb)     ! eq 12: abdul-razzak, ghan
+                do i=1,n_modes1
+                    if (.not.active(i)) cycle
+                    f1(i)=ghosh_f
+                    f2(i)=ghosh_g
+                    if (chi/eta(i) > 1._wp) p_exp(i)=ghosh_p
+                enddo
+            endif
 
-			g=rhow*r_gas*tcb/(svp(tcb)*dd(tcb,pcb)*molw_vap) + &
-			  lv*rhow/(ka(tcb)*tcb)* &
-			  (lv*molw_vap/(r_gas*tcb)-1._wp)                     
-			g=1._wp/g                                          ! eq 16: abdul-razzak, ghan
+            sum_term=0._wp
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                sum_term=sum_term+1._wp/sm(i)**2* &
+                    (f1(i)*(chi/eta(i))**p_exp(i) + &
+                     f2(i)*(sm(i)**2/(eta(i)+3._wp*chi))**0.75_wp)
+            enddo
+            if (sum_term <= 0._wp) return
+            smax=1._wp/sqrt(sum_term)
 
-			eta=(alpha_sup*w/g)**1.5_wp/ &
-				(2._wp*pi*rhow*sigma_sup*n_aer)                ! eq 22: abdul-razzak, ghan
-															   ! or 11: of 2000 paper
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                act_frac2(i)=0.5_wp*(1._wp-erf(2._wp*log(sm(i)/smax)/ &
+                               (3._wp*sqrt(2._wp)*sig_aer(i))))
+                act_frac2(i)=min(1._wp,max(0._wp,act_frac2(i)))
+                dcrit2(i)=2._wp*a/3._wp*(2._wp/smax/sqrt(b(i)))**(2._wp/3._wp)
+            enddo
 
-			chi=(2._wp/3._wp)*(alpha_sup*w/g)**0.5_wp*a       ! eq 23: abdul-razzak, ghan
-															   ! or 10: of 2000 paper
- 
-			! f1=1.5_wp*exp(2.25_wp*sig_aer**2)                ! eq 28: abdul-razzak, ghan
-			f1=a_arg*exp(b_arg*sig_aer**2)                  ! or 7 : of 2000 paper 
-															   ! a=0.5, b=2.5
-										
-		    f2=1._wp+0.25_wp*sig_aer                          ! eq 29: abdul-razzak, ghan
-															   ! or 8 : of 2000 paper
- 
-			! act_frac=0.5_wp*erfc(log(f1*(chi/eta)**1.5_wp &
-			!          +f2*(sm**2/(eta+3_wp*chi))**0.75_wp) / &
-			!          (3._wp*sqrt(2_wp)*sig_aer))             ! eq 30: abdul-razzak, ghan
+        else
+            a=4._wp*sigma*molw_vap/(rhow*r_gas*tcb)
+            sgi=huge(1._wp)
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                sgi(i)=sqrt(4._wp*a**3/(27._wp*b(i)*d_aer(i)**3))
+            enddo
 
-			smax=sum(1._wp/sm(1:n_modes1)**2* &
-			      (f1(1:n_modes1)*(chi/eta(1:n_modes1))**1.5_wp+ &
-				  f2(1:n_modes1)*(sm(1:n_modes1)**2._wp / &
-				  (eta(1:n_modes1)+3._wp*chi))**0.75_wp ))**0.5_wp
-			smax=1._wp/smax					               ! eq 6: of 2000 paper
-													
-			! smax=(f1*(chi/eta)**1.5_wp+ &
-			!       f2*(sm**2/eta)**0.75)**0.5
-			! smax=sm/smax                                     ! eq 31: abdul-razzak, ghan
+            smax=max(zeroin(1.e-20_wp,100.e-2_wp,fountoukis_nenes,1.e-20_wp),1.e-20_wp)
 
-			act_frac1=1._wp/sum(n_aer(1:n_modes1))* &
-			          sum(n_aer(1:n_modes1)*5.e-1_wp*(1._wp- &
-			          erf(2._wp*log(sm(1:n_modes1)/smax)/ &
-			          (3._wp*sqrt(2._wp)*sig_aer(1:n_modes1)) )))   ! eq 13: of 2000 paper
+            do i=1,n_modes1
+                if (.not.active(i)) cycle
+                act_frac2(i)=0.5_wp*(1._wp-erf(2._wp*log(sgi(i)/smax)/ &
+                               (3._wp*sqrt(2._wp)*sig_aer(i))))
+                act_frac2(i)=min(1._wp,max(0._wp,act_frac2(i)))
+                ! Use the smax solved in this call; smax1 is an output and may be
+                ! uninitialised on entry.
+                dcrit2(i)=((4._wp*a**3)/(smax**2*(27._wp*b(i))))**(1._wp/3._wp)
+            enddo
+        endif
 
-			act_frac2=1._wp/(n_aer)*(n_aer*5.e-1_wp*(1._wp- &
-		     erf(2._wp*log(sm/smax)/(3._wp*sqrt(2._wp)*sig_aer) ))) ! eq 13: of 2000 paper
+        act_frac1(1:n_modes1)=act_frac2(1:n_modes1)
+        smax1=smax
+        dcrit1(1:n_modes1)=dcrit2(1:n_modes1)
 
-            dcrit2=2._wp*a/3._wp*(2./smax/sqrt(b))**(2._wp/3._wp)
-		     
-		else if(method_flag.ge.2) then
-			a=4._wp*sigma*molw_vap/(rhow*r_gas*tcb)             ! eq 5: abdul-razzak, ghan
-			! above, 2 for abdul-razzak,4 for fountoukis and nenes
-  
-			b=density_final/ &
-			  ( (molw_core*mass_initial/nu_core+ & 
-			  sum(molw_org*mass_org_condensed/nu_org)* &
-			  	mass_initial/sum(mass_initial(1:n_modes1))) / &
-			  	mass_final)/(rhow/molw_vap)                   ! eq 6: abdul-razzak, ghan
-
-			sgi=sqrt(4._wp*a**3/27._wp/(b*d_aer**3))           ! eq 17 fountoukis and nenes
-
-			smax=max(zeroin(1.e-20_wp,100.e-2_wp, fountoukis_nenes,1.e-20_wp),1.e-20_wp)
-			
-			!act_frac=brent(10d-2,1.d-10,1.d-20,fountoukis_nenes,1.d-30,smax)
-			!smax=max(smax,1.d-20)
-
-			!act_frac=sum(0.5_wp*&
-			!   erfc(2_wp*log(sgi/smax)/(3_wp*sqrt(2_wp)*sig_aer))) ! eq 8 and 9 f+n 
-			act_frac1=1._wp/sum(n_aer(1:n_modes1))*&
-			 sum(n_aer(1:n_modes1)*5.e-1_wp*(1._wp- &
-			 erf(2._wp*log(sgi(1:n_modes1)/smax)/ &
-			 (3._wp*sqrt(2._wp)*sig_aer(1:n_modes1)) )))   ! eq 13: of 2000 paper
-
-			act_frac2=1._wp/(n_aer)*(n_aer*5.e-1_wp*(1._wp- &
-			 erf(2._wp*log(sgi/smax)/(3._wp*sqrt(2._wp)*sig_aer) )))! eq 13: of 2000 paper
-
-            dcrit2=( (4._wp*a**3) / (smax1**2 *(27._wp*b)) )**(1._wp/3._wp)
-		 end if
- 
-		 act_frac1=act_frac2
-		 smax1=smax
-		 dcrit1(1:n_modes1)=dcrit2(1:n_modes1)
-		 
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- 
-	end subroutine ctmm_activation
+    end subroutine ctmm_activation
 	
 	
 	
@@ -461,6 +521,86 @@
 			  (t-273.15_wp)/(257.14_wp + (t-273.15_wp)))
 	end function svp
 
+    ! Dry-air density corresponding to a total pressure, temperature and RH.
+    ! The BAM public number/mass mixing ratios are per kg of dry air.
+    function dry_air_density(t,p,rh)
+        use numerics_type
+        implicit none
+        real(wp), intent(in) :: t,p,rh
+        real(wp) :: dry_air_density, e
+        e=max(0._wp,min(rh*svp(t),0.999999_wp*p))
+        dry_air_density=(p-e)/(r_air*t)
+    end function dry_air_density
+
+
+    !>@brief
+    !>Diagnose one equivalent geometric standard deviation for the combined
+    !>aerosol PSD over a specified dry-diameter interval.  This is an
+    !>experimental extension for use with the Ghosh-modified ARG scheme; it is
+    !>not part of the published Ghosh et al. (2025) formulation.
+    !>
+    !>The calculation treats ln(D) for each lognormal mode as a normal
+    !>distribution, integrates its zeroth/first/second ln(D) moments between
+    !>dmin and dmax analytically, combines the modes by number, and returns
+    !>sigma_g,eff = exp(sqrt(var(ln D))).
+    function effective_accum_sigma(nmodes,n,d,logsig,dmin,dmax)
+        use numerics_type
+        implicit none
+        integer(i4b), intent(in) :: nmodes
+        real(wp), dimension(nmodes), intent(in) :: n,d,logsig
+        real(wp), intent(in) :: dmin,dmax
+        real(wp) :: effective_accum_sigma
+
+        integer(i4b) :: i
+        real(wp) :: mu, ss, ya, yb, za, zb, prob, phia, phib
+        real(wp) :: m0, m1, m2, mode_m1, mode_m2, mean_y, var_y
+        real(wp), parameter :: sqrt2=1.4142135623730950488_wp
+        real(wp), parameter :: inv_sqrt_2pi=0.39894228040143267794_wp
+
+        if (dmin <= 0._wp .or. dmax <= dmin) &
+            error stop 'BAM: require 0 < ghosh_dmin < ghosh_dmax'
+
+        ya=log(dmin)
+        yb=log(dmax)
+        m0=0._wp
+        m1=0._wp
+        m2=0._wp
+
+        do i=1,nmodes
+            if (n(i) <= 0._wp) cycle
+            if (d(i) <= 0._wp .or. logsig(i) <= 0._wp) cycle
+
+            mu=log(d(i))
+            ss=logsig(i)
+            za=(ya-mu)/ss
+            zb=(yb-mu)/ss
+
+            prob=0.5_wp*(erf(zb/sqrt2)-erf(za/sqrt2))
+            if (prob <= tiny(1._wp)) cycle
+
+            phia=inv_sqrt_2pi*exp(-0.5_wp*za**2)
+            phib=inv_sqrt_2pi*exp(-0.5_wp*zb**2)
+
+            mode_m1=mu*prob + ss*(phia-phib)
+            mode_m2=(mu**2+ss**2)*prob + 2._wp*mu*ss*(phia-phib) + &
+                    ss**2*(za*phia-zb*phib)
+
+            m0=m0+n(i)*prob
+            m1=m1+n(i)*mode_m1
+            m2=m2+n(i)*mode_m2
+        enddo
+
+        if (m0 <= tiny(1._wp)) &
+            error stop 'BAM: no aerosol number lies in Ghosh effective-width interval'
+
+        mean_y=m1/m0
+        var_y=max(0._wp,m2/m0-mean_y**2)
+        effective_accum_sigma=exp(sqrt(var_y))
+
+        if (effective_accum_sigma <= 1._wp) &
+            error stop 'BAM: diagnosed Ghosh effective sigma_g is not > 1'
+    end function effective_accum_sigma
+
 
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! 3rd moment - for integration												   !
@@ -499,7 +639,6 @@
 		real(wp), intent(in) :: d1
 		real(wp) :: mass_integrate
 
-		integer(i4b):: i
 		d_dummy=d1  ! guess at d_aer, used to calculate the new standard deviation
 		sig_dummy=zeroin(1.e-9_wp,2._wp,find_sig_aer,1.e-6_wp)
 		!  mass_integrate=abs(qromb(ln3,0.d-10,3.d-6)-mass_dummy)
@@ -519,14 +658,14 @@
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
 	!>calculates the thermal conductivity of air
-	!>@param[in] sig_aer_new: geometric standard deviation
+	!>@param[in] sig_aer_new: logarithmic geometric width ln(sigma_g)
 	!>@return find_sig_aer: arithmetic standard deviation
 	function find_sig_aer(sig_aer_new)
 	    use numerics_type
 		real(wp), intent(in) :: sig_aer_new
 		real(wp) :: find_sig_aer
 		real(wp) :: sd1
-		sd1=exp(log(d_dummy)+0.5_wp*sig_aer_new)*sqrt(exp(sig_aer_new**2)-1._wp)
+		sd1=exp(log(d_dummy)+0.5_wp*sig_aer_new**2)*sqrt(exp(sig_aer_new**2)-1._wp)
 		find_sig_aer=sd1-sd_dummy
 	end function find_sig_aer
 
@@ -579,6 +718,7 @@
 		integral=0._wp
 		integral1=0._wp
 		do i=1,n_mode_s
+          if (n_aer(i) <= 0._wp) cycle
 		  c1(3)=2_wp*n_aer(i)/(3._wp*sqrt(2._wp*pi)*sig_aer(i))
 		  c1(4)=sgi(i)
 		  c1(5)=2._wp*sig_aer(i)**2
@@ -651,7 +791,7 @@
 	!>parameterisation developed at university of manchester
 	!>@param[in] n_modes1: number of aerosol modes
 	!>@param[in] n_sv1: number of volatility bins
-	!>@param[in] org_content1: amount of organic in volatility bins
+	!>@param[in] org_content1: organic mass concentration internal to solver (kg m-3)
 	!>@param[in] nu_org1: van hoff factor in volatility bins
 	!>@param[in] molw_org1: molecular weight in volatility bins
 	!>@param[in] mass_core: mass in aerosol modes
@@ -660,79 +800,85 @@
 	!>@param[in] s1, t1: rh and temperature.
 	!>@param[inout] mass_org_condensed1: condensed organics
 	subroutine solve_semivolatiles(n_modes1,n_sv1, &
-					org_content1, log_c_star1, delta_h_vap1, &
-					nu_org1, molw_org1, &
-					mass_core1, nu_core1, molw_core1,s1, t1, &
-					mass_org_condensed1)
-	    use numerics_type
-		use numerics, only : zeroin
-		implicit none
-		integer(i4b), intent(in) :: n_modes1, n_sv1
-		real(wp), dimension(n_sv1), intent(in) :: org_content1, nu_org1, molw_org1, &
-							log_c_star1, delta_h_vap1
-		real(wp), dimension(n_modes1), intent(in) :: mass_core1, nu_core1, molw_core1
-		real(wp), intent(in) :: s1, t1
-		real(wp), dimension(n_sv1), intent(inout) :: mass_org_condensed1
-		
-		
-		real(wp) :: ct
-		real(wp), dimension(n_sv1) :: c_c
-		
-		
-		! set variables in module (for passing to optimizer)
-		nu_org=nu_org1
-		molw_org=molw_org1
-		nu_core=nu_core1
-		molw_core=molw_core1
-		s=s1
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		
-		cstar = 10._wp**log_c_star1* (298.15_wp/t1) * &
-					exp(-delta_h_vap1*1.e3_wp/r_gas *(1._wp/t1-1._wp/298.15_wp))/1.e9_wp
-										 ! c* needs to be adjusted by delta_h_vap / t
-		c_ions=org_content1*nu_org1/molw_org1 ! c - all ions
-		c0=sum(mass_core1*nu_core1/molw_core1)  ! number of "core" ions
-		ct=1._wp/(1._wp-s)*(sum(c_ions)+c0)  ! equation 5 from Crooks et al. (2016, GMD)
-										! basically saturation ratio is mole fraction
-		! ct is the total concentration of all ions in the condensed phase
-		! solve iteratively to find CT in matt's paper
-		ct=abs(zeroin(ct,1._wp/(1._wp-s)*c0,partition01,1.e-8_wp))
-		!xmin=brent(1.e-15_wp,1.e-8_wp,ct*5._wp, &
-		!					partition01,1.e-10_wp,ct)
-		
-		epsilon1=(1._wp+cstar/ct)**(-1) ! partitioning coefficients
-		c_c=c_ions*epsilon1   ! condensed
+                    org_content1, log_c_star1, delta_h_vap1, &
+                    nu_org1, molw_org1, &
+                    mass_core1, nu_core1, molw_core1,s1, t1, &
+                    mass_org_condensed1)
+        use numerics_type
+        use numerics, only : zeroin
+        implicit none
+        integer(i4b), intent(in) :: n_modes1, n_sv1
+        real(wp), dimension(n_sv1), intent(in) :: org_content1, nu_org1, molw_org1, &
+                            log_c_star1, delta_h_vap1
+        real(wp), dimension(n_modes1), intent(in) :: mass_core1, nu_core1, molw_core1
+        real(wp), intent(in) :: s1, t1
+        real(wp), dimension(n_sv1), intent(inout) :: mass_org_condensed1
 
-		mass_org_condensed1=c_c/nu_org1*molw_org1
-		
-	end subroutine solve_semivolatiles
-	
-	
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	! partition01          										        		   !
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	!>@author
-	!>Paul J. Connolly, The University of Manchester
-	!>@brief
-	!>calculates the partitioning coefficient according to Crooks et al (2016 GMD)
-	!>@param[in] ct: total ions, including water
-	!>@return guess, minus calculated - for root-finder
-	function partition01(ct)
-	    use numerics_type
-		implicit none
-		real(wp), intent(in) :: ct
-		real(wp), dimension(size(epsilon1)) :: c_c
-		real(wp) :: partition01
-		
-		real(wp) :: ct1, ct2
-		ct2=abs(ct)
-		epsilon1 = (1._wp+cstar/(ct2))**(-1)
-		c_c=(c_ions)*epsilon1
-		ct1=1._wp/(1._wp-s)*(sum(c_c*nu_org)+c0)
-		
-		partition01=(ct1-ct2)
-	
-	end function partition01
+        real(wp) :: ct, ct_lo, ct_hi, tol
+        real(wp), dimension(n_sv1) :: c_c
+
+        nu_org=nu_org1
+        molw_org=molw_org1
+        nu_core=nu_core1
+        molw_core=molw_core1
+        s=s1
+        mass_org_condensed1=0._wp
+        epsilon1=0._wp
+
+        if (s >= 1._wp) error stop 'BAM: semi-volatile equilibrium requires RH < 1'
+        if (any(molw_org1 <= 0._wp)) error stop 'BAM: organic molecular weights must be > 0'
+
+        ! log_c_star is log10(C* / (microgram m-3)), following the 2014
+        ! semi-volatile activation formulation.  Convert the temperature-adjusted
+        ! C* from microgram m-3 -> kg m-3 -> mol m-3 so it is consistent with
+        ! the molar partitioning concentrations below.
+        cstar = 10._wp**log_c_star1*(298.15_wp/t1)* &
+                exp(-delta_h_vap1*1.e3_wp/r_gas*(1._wp/t1-1._wp/298.15_wp))* &
+                1.e-9_wp/molw_org1
+
+        ! org_content1 and mass_core1 arrive here in kg m-3.  Convert to
+        ! effective solute molar concentrations (mol m-3).
+        c_ions=org_content1*nu_org1/molw_org1
+        c0=sum(mass_core1*nu_core1/molw_core1)
+
+        if (sum(c_ions) <= 0._wp .or. c0 <= 0._wp) return
+
+        ! Equation 5 of the absorptive partitioning treatment brackets C_OA
+        ! between the no-organic-condensation and all-organic-condensation limits.
+        ct_lo=c0/(1._wp-s)
+        ct_hi=(c0+sum(c_ions))/(1._wp-s)
+        tol=max(1.e-14_wp,1.e-8_wp*ct_hi)
+        if (ct_hi-ct_lo <= tol) then
+            ct=ct_lo
+        else
+            ct=zeroin(ct_lo,ct_hi,partition01,tol)
+        endif
+
+        epsilon1=(1._wp+cstar/max(ct,tiny(1._wp)))**(-1)
+        c_c=c_ions*epsilon1
+        mass_org_condensed1=c_c/nu_org1*molw_org1
+
+    end subroutine solve_semivolatiles
+
+
+    function partition01(ct)
+        use numerics_type
+        implicit none
+        real(wp), intent(in) :: ct
+        real(wp), dimension(size(epsilon1)) :: c_c
+        real(wp) :: partition01
+        real(wp) :: ct1, ct2
+
+        ct2=max(abs(ct),tiny(1._wp))
+        epsilon1=(1._wp+cstar/ct2)**(-1)
+        c_c=c_ions*epsilon1
+
+        ! c_ions already contains the effective van't Hoff multiplier, so do
+        ! not multiply by nu_org a second time here.
+        ct1=1._wp/(1._wp-s)*(sum(c_c)+c0)
+        partition01=ct1-ct2
+
+    end function partition01
 	
 	
 		
@@ -743,7 +889,7 @@
 	!>allocate arrays for activation code
 	!>@param[in] n_modes: number of aerosol modes
 	!>@param[in] n_sv: number of organic / volatility modes
-	!>@param[inout] n_aer1: number in modes
+	!>@param[inout] n_aer1: number mixing ratio in modes (kg-1 dry air)
 	!>@param[inout] d_aer1: diameter in modes
 	!>@param[inout] sig_aer1: geo std in modes
 	!>@param[inout] molw_core1:molw in core
@@ -857,9 +1003,17 @@
 		allocate( delta_h_vap(1:n_sv), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
 		allocate( delta_h_vap1(1:n_sv), STAT = AllocateStatus)
-		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
-		
-	
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+
+        n_aer=0._wp; d_aer=0._wp; sig_aer=0._wp; d_aer_new=0._wp
+        sgi=0._wp; density_final=0._wp; mass_initial=0._wp; mass_final=0._wp
+        sd=0._wp; b=0._wp; sm=0._wp; eta=0._wp; f1=0._wp; f2=0._wp
+        density_core=0._wp; molw_core=0._wp; nu_core=0._wp
+        act_frac=0._wp; act_frac1=0._wp; act_frac2=0._wp; dcrit1=0._wp
+        molw_org=0._wp; r_org=0._wp; log_c_star=0._wp; cstar=0._wp
+        c_ions=0._wp; epsilon1=0._wp; org_content=0._wp; density_org=0._wp
+        nu_org=0._wp; mass_org_condensed=0._wp; delta_h_vap=0._wp
+
 	end subroutine allocate_arrays
 	
 	!>@author
@@ -871,81 +1025,55 @@
 	!>@param[in] p1: pressure (Pa)
 	!>@param[in] t1: temperature (K)
 	!>@param[in] w1: vertical wind (m/s)
-	!>@param[in] n_aer1: number concentration in modes
+	!>@param[in] n_aer1: number mixing ratio in modes (kg-1 dry air)
 	!>@param[in] d_aer1: diameter in modes
-	!>@param[in] sig_aer1: geometric standard deviation in modes
+	!>@param[in] sig_aer1: logarithmic geometric width ln(sigma_g) in modes
 	!>@param[in] molw_org1: molecular weight in volatility bins
 	!>@param[in] density_core1: density in modes
 	subroutine initialise_arrays(n_modes,n_sv,p1,t1,w1,n_aer1, &
-								d_aer1,sig_aer1, molw_org1,density_core1)
-	    use numerics_type
-		implicit none
-		integer(i4b), intent(in) :: n_modes, n_sv
-		real(wp), intent(in) :: p1,t1,w1
-		real(wp), dimension(n_modes), intent(in) :: n_aer1,d_aer1,sig_aer1, density_core1
-		real(wp), dimension(n_sv), intent(in) :: molw_org1
-		
-		integer(i4b) :: i
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! define initial conditions                                                      !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		rhinit=0.999_wp                                ! as a fraction - assume we are
-													   ! assume we are at cb.
-		pinit=p1                                       ! pascals
-		tinit=t1                                       ! kelvin
-		w    =w1                                       ! m s-1
-		n_aer=n_aer1
-		d_aer=d_aer1
-		sig_aer=sig_aer1
-		molw_org=molw_org1
-		density_core=density_core1
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		
-		
-		
-		
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! define the organic properties                                                  !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		!log_c_star=(/(i,i=-0,3)/)                      ! watch out for type?
-		!nu_org=1._wp                                    ! disociation factor
-		!molw_org=200e-3_wp                                ! kg per mol
-		r_org=r_gas/molw_org
-		!density_org=1500._wp                            ! kg m-3
-		!delta_h_vap=150._wp                             ! enthalpy phase change (kj mol-1)
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		
-		
-		
+                                d_aer1,sig_aer1, molw_org1,density_core1)
+        use numerics_type
+        implicit none
+        integer(i4b), intent(in) :: n_modes, n_sv
+        real(wp), intent(in) :: p1,t1,w1
+        real(wp), dimension(n_modes), intent(in) :: n_aer1,d_aer1,sig_aer1, density_core1
+        real(wp), dimension(n_sv), intent(in) :: molw_org1
 
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! find the t & p at cloud base                                                   !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		pcb=pinit !zbrent(dry_potential,10000._wp,pinit,1.d-8)
-		tcb=tinit !tinit*(pcb/pinit)**kappa
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        integer(i4b) :: i
+        real(wp) :: rho_dry_local
 
+        rhinit=0.999_wp
+        pinit=p1
+        tinit=t1
+        w=w1
+        pcb=pinit
+        tcb=tinit
 
+        ! Public aerosol number is a dry-air number mixing ratio (# kg-1).
+        ! ARG/FN and the equilibrium partitioning calculation use volumetric
+        ! concentrations, so convert once at the internal boundary.
+        rho_dry_local=dry_air_density(t1,p1,rhinit)
+        n_aer=n_aer1*rho_dry_local
+        d_aer=d_aer1
+        sig_aer=sig_aer1
+        molw_org=molw_org1
+        density_core=density_core1
 
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! initial mass in ith distribution                                               !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		do i=1,n_modes
-			density_dummy=density_core(i)                  ! the density of the core dist.
-			n_dummy=n_aer(i)
-			sd_dummy=sig_aer(i)
-			d_dummy=d_aer(i)
-			! initial mass in ith distribution
-			! moment generating function
-			! http://www.mlahanas.de/math/lognormal.htm
-			mass_initial(i)=n_dummy*exp(3._wp*log(d_dummy) + &
-							3._wp**2_wp*sd_dummy**2/2._wp) &
-						   *density_dummy*pi/6._wp
-		enddo
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        r_org=0._wp
+        where(molw_org > 0._wp) r_org=r_gas/molw_org
 
+        mass_initial=0._wp
+        do i=1,n_modes
+            if (n_aer(i) <= 0._wp) cycle
+            density_dummy=density_core(i)
+            n_dummy=n_aer(i)
+            sd_dummy=sig_aer(i)
+            d_dummy=d_aer(i)
+            mass_initial(i)=n_dummy*exp(3._wp*log(d_dummy) + &
+                            4.5_wp*sd_dummy**2)*density_dummy*pi/6._wp
+        enddo
 
-	end subroutine initialise_arrays
+    end subroutine initialise_arrays
 	
 	
 	!>@author
@@ -954,45 +1082,103 @@
 	!>read in the data from the namelists for the BAM module
 	!>@param[in] nmlfile
 	subroutine read_in_bam_namelist(nmlfile)
-		implicit none
-        character (len=200), intent(in) :: nmlfile
-	    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! namelists                                                            !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! set up flags, etc
+        implicit none
+        character(len=*), intent(in) :: nmlfile
+        integer :: iu, ios
+        character(len=512) :: iomsg
+
         namelist /bulk_aerosol_setup/ n_mode, n_sv, sv_flag, &
-        			method_flag, giant_flag, &
-        			a_eq_7, b_eq_7      
-        ! run parameters / input arrays
+                    method_flag, giant_flag, a_eq_7, b_eq_7, &
+                    ghosh_sigma_mode, ghosh_sigma_acc, ghosh_dmin, ghosh_dmax
         namelist /bulk_aerosol_spec/ n_aer1, d_aer1, sig_aer1, &
-        					molw_core1, density_core1, &
-        					nu_core1, org_content1, molw_org1, density_org1, &
-        					delta_h_vap1, &
-        					nu_org1, log_c_star1, p_test, t_test, w_test, &
-        					rand_dist, n_rand, mean_w,sigma_w
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    molw_core1, density_core1, nu_core1, org_content1, &
+                    molw_org1, density_org1, delta_h_vap1, nu_org1, log_c_star1, &
+                    p_test, t_test, w_test, rand_dist, n_rand, mean_w, sigma_w
 
+        n_mode=0
+        n_sv=0
+        sv_flag=0
+        method_flag=1
+        giant_flag=0
+        a_eq_7=0.21_wp
+        b_eq_7=1.58_wp
+        ghosh_sigma_mode=0
+        ghosh_sigma_acc=1.6_wp
+        ghosh_dmin=80.e-9_wp
+        ghosh_dmax=1.e-6_wp
+        ghosh_sigma_used=ghosh_sigma_acc
 
+        open(newunit=iu,file=trim(nmlfile),status='old',action='read',iostat=ios,iomsg=iomsg)
+        if (ios /= 0) error stop 'BAM: cannot open namelist: '//trim(iomsg)
+        read(iu,nml=bulk_aerosol_setup,iostat=ios,iomsg=iomsg)
+        if (ios /= 0) error stop 'BAM: error reading bulk_aerosol_setup: '//trim(iomsg)
 
+        if (n_mode <= 0) error stop 'BAM: n_mode must be > 0'
+        if (n_sv <= 0) error stop 'BAM: n_sv must be > 0'
+        if (sv_flag < 0 .or. sv_flag > 1) error stop 'BAM: sv_flag must be 0 or 1'
+        if (method_flag < 1 .or. method_flag > 4) error stop 'BAM: method_flag must be 1, 2, 3 or 4'
+        if (giant_flag < 0 .or. giant_flag > 1) error stop 'BAM: giant_flag must be 0 or 1'
+        if (ghosh_sigma_mode < 0 .or. ghosh_sigma_mode > 1) &
+            error stop 'BAM: ghosh_sigma_mode must be 0 or 1'
+        if (ghosh_sigma_acc <= 1._wp) error stop 'BAM: ghosh_sigma_acc must be > 1'
+        if (ghosh_dmin <= 0._wp .or. ghosh_dmax <= ghosh_dmin) &
+            error stop 'BAM: require 0 < ghosh_dmin < ghosh_dmax'
+        if (method_flag.eq.4 .and. ghosh_sigma_mode.eq.0 .and. &
+            (ghosh_sigma_acc < 1.4_wp .or. ghosh_sigma_acc > 2.1_wp)) &
+            error stop 'BAM: fixed Ghosh sigma must be within calibrated range 1.4 to 2.1'
 
+        call allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
+            molw_core1,density_core1,nu_core1,org_content1, &
+            molw_org1,density_org1,delta_h_vap1,nu_org1,log_c_star1, &
+            act_frac1,dcrit2)
 
+        ! Sentinels make missing required namelist entries fail clearly rather
+        ! than propagating uninitialised memory into the activation equations.
+        n_aer1=-1._wp
+        d_aer1=-1._wp
+        sig_aer1=-1._wp
+        molw_core1=-1._wp
+        density_core1=-1._wp
+        nu_core1=-1._wp
+        org_content1=0._wp
+        molw_org1=-1._wp
+        density_org1=-1._wp
+        delta_h_vap1=0._wp
+        nu_org1=-1._wp
+        log_c_star1=0._wp
+        p_test=-1._wp
+        t_test=-1._wp
+        w_test=0._wp
+        rand_dist=.false.
+        n_rand=1
+        mean_w=0._wp
+        sigma_w=1._wp
 
+        read(iu,nml=bulk_aerosol_spec,iostat=ios,iomsg=iomsg)
+        close(iu)
+        if (ios /= 0) error stop 'BAM: error reading bulk_aerosol_spec: '//trim(iomsg)
 
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! read in namelists	and allocate arrays								   !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        open(8,file=nmlfile,status='old', recl=80, delim='apostrophe')
-        read(8,nml=bulk_aerosol_setup)
-        ! allocate memory / init
-		call allocate_arrays(n_mode,n_sv,n_aer1,d_aer1,sig_aer1, &
-			molw_core1,density_core1,nu_core1,org_content1, &
-			molw_org1, density_org1,delta_h_vap1,nu_org1,log_c_star1, &
-			act_frac1,dcrit2)
-        
-        read(8,nml=bulk_aerosol_spec)
-        close(8)
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	end subroutine read_in_bam_namelist
+        if (any(n_aer1 < 0._wp)) error stop 'BAM: all n_aer1 values are required and must be >= 0 kg-1'
+        if (any(d_aer1 <= 0._wp)) error stop 'BAM: all d_aer1 values are required and must be > 0 m'
+        if (any(sig_aer1 <= 0._wp)) error stop 'BAM: sig_aer1 is ln(sigma_g) and must be > 0'
+        if (any(molw_core1 <= 0._wp)) error stop 'BAM: all molw_core1 values must be > 0 kg mol-1'
+        if (any(density_core1 <= 0._wp)) error stop 'BAM: all density_core1 values must be > 0 kg m-3'
+        if (any(nu_core1 <= 0._wp)) error stop 'BAM: all nu_core1 values must be > 0'
+        if (p_test <= 0._wp .or. t_test <= 0._wp) error stop 'BAM: p_test and t_test must be > 0'
+        if (sv_flag.eq.1) then
+            if (any(org_content1 < 0._wp)) error stop 'BAM: org_content1 must be >= 0 microgram kg-1'
+            if (any(molw_org1 <= 0._wp)) error stop 'BAM: molw_org1 must be > 0 when sv_flag=1'
+            if (any(density_org1 <= 0._wp)) error stop 'BAM: density_org1 must be > 0 when sv_flag=1'
+            if (any(nu_org1 <= 0._wp)) error stop 'BAM: nu_org1 must be > 0 when sv_flag=1'
+        else
+            ! These are unused with sv_flag=0; provide benign values so callers
+            ! need not specify dummy semi-volatile properties.
+            where(molw_org1 <= 0._wp) molw_org1=0.2_wp
+            where(density_org1 <= 0._wp) density_org1=1500._wp
+            where(nu_org1 <= 0._wp) nu_org1=1._wp
+        endif
+
+    end subroutine read_in_bam_namelist
 	
 
 	
