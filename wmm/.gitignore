@@ -1,8 +1,0 @@
-*.o
-*.mod
-*.a
-*.so
-*.exe
-*~
-doxygen
-.DS_Store
